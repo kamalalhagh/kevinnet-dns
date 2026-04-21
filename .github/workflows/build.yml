@@ -3,25 +3,22 @@ name: Build All Platforms
 on:
   push:
     tags:
-      - "v*"          # triggers on version tags like v1.0.0
-  workflow_dispatch:  # allows manual trigger from GitHub Actions UI
+      - "v*"
+  workflow_dispatch:
 
 jobs:
 
-  # ── Windows x64 ────────────────────────────────────────────
+  # ── Windows x64 ──────────────────────────────────────────────
   windows-x64:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
           architecture: "x64"
-
       - name: Install packages
         run: python -m pip install dnspython pyinstaller pillow --upgrade --quiet
-
       - name: Build EXE
         run: |
           $addData = ""
@@ -29,25 +26,21 @@ jobs:
           if (Test-Path "MasterDnsVPN")     { $addData += ' --add-data "MasterDnsVPN;."' }
           $cmd = "python -m PyInstaller --onefile --windowed --name KevinNet_Windows_x64 --clean$addData kevinnet.py"
           Invoke-Expression $cmd
-
       - uses: actions/upload-artifact@v4
         with:
           name: Windows-x64
           path: dist/KevinNet_Windows_x64.exe
 
-  # ── Windows ARM64 ───────────────────────────────────────────
+  # ── Windows ARM64 ────────────────────────────────────────────
   windows-arm64:
     runs-on: windows-11-arm
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: Install packages
         run: python -m pip install dnspython pyinstaller pillow --upgrade --quiet
-
       - name: Build EXE
         run: |
           $addData = ""
@@ -55,90 +48,127 @@ jobs:
           if (Test-Path "MasterDnsVPN")     { $addData += ' --add-data "MasterDnsVPN;."' }
           $cmd = "python -m PyInstaller --onefile --windowed --name KevinNet_Windows_ARM64 --clean$addData kevinnet.py"
           Invoke-Expression $cmd
-
       - uses: actions/upload-artifact@v4
         with:
           name: Windows-ARM64
           path: dist/KevinNet_Windows_ARM64.exe
 
-  # ── macOS Universal (arm64 + x86_64) ───────────────────────
-  macos-universal:
+  # ── macOS Apple Silicon (arm64) ───────────────────────────────
+  macos-arm64:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install ARM Python + deps
+      - name: Install Python arm64 + deps
         run: |
           brew install python@3.12 python-tk@3.12
-          /opt/homebrew/opt/python@3.12/bin/python3.12 -m venv .venv_arm
-          .venv_arm/bin/pip install dnspython pyinstaller pillow --upgrade --quiet
-
-      - name: Install x86_64 Python + deps
-        run: |
-          # Download official universal/intel Python
-          curl -fsSL https://www.python.org/ftp/python/3.12.9/python-3.12.9-macos11.pkg \
-            -o /tmp/python_intel.pkg
-          sudo installer -pkg /tmp/python_intel.pkg -target /
-          /usr/local/bin/python3.12 -m venv .venv_x86
-          arch -x86_64 .venv_x86/bin/pip install dnspython pyinstaller pillow --upgrade --quiet
-
-      - name: Build ARM64
+          /opt/homebrew/opt/python@3.12/bin/python3.12 -m venv .venv
+          .venv/bin/pip install dnspython pyinstaller pillow --upgrade --quiet
+      - name: Build arm64 binary
         run: |
           ADD_DATA=""
           [ -f "MasterDnsVPN"     ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN:."
           [ -f "MasterDnsVPN.exe" ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN.exe:."
-          .venv_arm/bin/python -m PyInstaller \
+          .venv/bin/python -m PyInstaller \
             --onefile --name KevinNet_arm64 --clean \
             $ADD_DATA kevinnet.py
+          if [ ! -f "dist/KevinNet_arm64" ] && [ -d "dist/KevinNet_arm64.app" ]; then
+            cp "dist/KevinNet_arm64.app/Contents/MacOS/KevinNet_arm64" "dist/KevinNet_arm64"
+          fi
+          echo "=== arm64 arch ===" && lipo -archs dist/KevinNet_arm64
+          # copy with final name too
+          cp dist/KevinNet_arm64 dist/KevinNet_macOS_arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macOS-arm64
+          path: dist/KevinNet_macOS_arm64
 
-      - name: Build x86_64
+  # ── macOS Intel (x86_64) ─────────────────────────────────────
+  macos-intel:
+    runs-on: macos-13
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Python x86_64 + deps
+        run: |
+          brew install python@3.12 python-tk@3.12
+          python3.12 -m venv .venv
+          .venv/bin/pip install dnspython pyinstaller pillow --upgrade --quiet
+      - name: Build x86_64 binary
         run: |
           ADD_DATA=""
           [ -f "MasterDnsVPN"     ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN:."
           [ -f "MasterDnsVPN.exe" ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN.exe:."
-          arch -x86_64 .venv_x86/bin/python -m PyInstaller \
+          .venv/bin/python -m PyInstaller \
             --onefile --name KevinNet_x86_64 --clean \
             $ADD_DATA kevinnet.py
-
-      - name: Extract from .app if needed
-        run: |
-          for ARCH in arm64 x86_64; do
-            if [ ! -f "dist/KevinNet_${ARCH}" ] && \
-               [ -d "dist/KevinNet_${ARCH}.app" ]; then
-              cp "dist/KevinNet_${ARCH}.app/Contents/MacOS/KevinNet_${ARCH}" \
-                 "dist/KevinNet_${ARCH}"
-            fi
-          done
-
-      - name: Combine Universal Binary
-        run: |
-          lipo -create \
-            dist/KevinNet_arm64 \
-            dist/KevinNet_x86_64 \
-            -output dist/KevinNet_macOS_Universal
-          echo "Architectures: $(lipo -archs dist/KevinNet_macOS_Universal)"
-
+          if [ ! -f "dist/KevinNet_x86_64" ] && [ -d "dist/KevinNet_x86_64.app" ]; then
+            cp "dist/KevinNet_x86_64.app/Contents/MacOS/KevinNet_x86_64" "dist/KevinNet_x86_64"
+          fi
+          echo "=== x86_64 arch ===" && lipo -archs dist/KevinNet_x86_64
+          # copy with final name too
+          cp dist/KevinNet_x86_64 dist/KevinNet_macOS_Intel
       - uses: actions/upload-artifact@v4
         with:
-          name: macOS-Universal
-          path: dist/KevinNet_macOS_Universal
+          name: macOS-Intel
+          path: dist/KevinNet_macOS_Intel
 
-  # ── Linux x64 ───────────────────────────────────────────────
+  # ── macOS Universal (lipo arm64 + x86_64) ────────────────────
+  macos-universal:
+    needs: [macos-arm64, macos-intel]
+    runs-on: macos-latest
+    steps:
+      - name: Download arm64
+        uses: actions/download-artifact@v4
+        with:
+          name: macOS-arm64
+          path: bins/
+      - name: Download Intel
+        uses: actions/download-artifact@v4
+        with:
+          name: macOS-Intel
+          path: bins/
+      - name: Verify downloads
+        run: |
+          echo "=== Files in bins/ ==="
+          ls -lh bins/
+          echo "=== arm64 arch ==="
+          chmod +x bins/KevinNet_macOS_arm64
+          lipo -archs bins/KevinNet_macOS_arm64
+          echo "=== Intel arch ==="
+          chmod +x bins/KevinNet_macOS_Intel
+          lipo -archs bins/KevinNet_macOS_Intel
+      - name: Create Universal Binary
+        run: |
+          lipo -create \
+            bins/KevinNet_macOS_arm64 \
+            bins/KevinNet_macOS_Intel \
+            -output bins/KevinNet_macOS_Universal
+          echo "=== Universal archs (must show both) ==="
+          lipo -archs bins/KevinNet_macOS_Universal
+          ARCHS=$(lipo -archs bins/KevinNet_macOS_Universal)
+          if [[ "$ARCHS" != *"arm64"* ]] || [[ "$ARCHS" != *"x86_64"* ]]; then
+            echo "FAIL: missing a slice — got: $ARCHS"
+            exit 1
+          fi
+          echo "SUCCESS: $ARCHS"
+          ls -lh bins/
+      - name: Upload Universal
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS-Universal
+          path: bins/KevinNet_macOS_Universal
+
+  # ── Linux x64 ────────────────────────────────────────────────
   linux-x64:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: Install system deps
         run: sudo apt-get install -y python3-tk
-
       - name: Install packages
         run: python -m pip install dnspython pyinstaller pillow --upgrade --quiet
-
       - name: Build binary
         run: |
           ADD_DATA=""
@@ -148,28 +178,23 @@ jobs:
             --onefile --windowed \
             --name KevinNet_Linux_x64 \
             --clean $ADD_DATA kevinnet.py
-
       - uses: actions/upload-artifact@v4
         with:
           name: Linux-x64
           path: dist/KevinNet_Linux_x64
 
-  # ── Linux ARM64 ─────────────────────────────────────────────
+  # ── Linux ARM64 ──────────────────────────────────────────────
   linux-arm64:
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
-
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
       - name: Install system deps
         run: sudo apt-get install -y python3-tk
-
       - name: Install packages
         run: python -m pip install dnspython pyinstaller pillow --upgrade --quiet
-
       - name: Build binary
         run: |
           ADD_DATA=""
@@ -179,58 +204,61 @@ jobs:
             --onefile --windowed \
             --name KevinNet_Linux_ARM64 \
             --clean $ADD_DATA kevinnet.py
-
       - uses: actions/upload-artifact@v4
         with:
           name: Linux-ARM64
           path: dist/KevinNet_Linux_ARM64
 
-  # ── Create GitHub Release with all binaries ─────────────────
+  # ── Create GitHub Release ─────────────────────────────────────
   release:
-    needs: [windows-x64, windows-arm64, macos-universal, linux-x64, linux-arm64]
+    needs: [windows-x64, windows-arm64, macos-arm64, macos-intel, macos-universal, linux-x64, linux-arm64]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
-
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: release_files/
-
       - name: List release files
-        run: find release_files/ -type f
-
+        run: find release_files/ -type f | sort
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
-          name: "KevinNet DNS Config ${{ github.ref_name }}"
+          name: "KevinNet DNS ${{ github.ref_name }}"
           body: |
-            ## KevinNet DNS Config ${{ github.ref_name }}
+            ## KevinNet DNS ${{ github.ref_name }}
 
             Companion tool for [MasterDnsVPN](https://github.com/masterking32/MasterDnsVPN)
             by [Kevin Haji](https://kevinhaji.com)
 
             ### Download for your platform:
 
-            | Platform | File |
-            |---|---|
-            | 🪟 Windows x64 | `KevinNet_Windows_x64.exe` |
-            | 🪟 Windows ARM64 | `KevinNet_Windows_ARM64.exe` |
-            | 🍎 macOS Universal | `KevinNet_macOS_Universal` |
-            | 🐧 Linux x64 | `KevinNet_Linux_x64` |
-            | 🐧 Linux ARM64 | `KevinNet_Linux_ARM64` |
+            | Platform | File | Notes |
+            |---|---|---|
+            | 🪟 Windows x64 | `KevinNet_Windows_x64.exe` | Most Windows PCs |
+            | 🪟 Windows ARM64 | `KevinNet_Windows_ARM64.exe` | Surface, Snapdragon |
+            | 🍎 macOS Universal | `KevinNet_macOS_Universal` | ✅ Recommended — all Macs |
+            | 🍎 macOS Apple Silicon | `KevinNet_macOS_arm64` | M1/M2/M3 fallback |
+            | 🍎 macOS Intel | `KevinNet_macOS_Intel` | Intel fallback |
+            | 🐧 Linux x64 | `KevinNet_Linux_x64` | |
+            | 🐧 Linux ARM64 | `KevinNet_Linux_ARM64` | |
 
-            **macOS:** Right-click → Open → Open to bypass Gatekeeper.
-            **Linux:** Run `chmod +x KevinNet_Linux_*` first.
+            **macOS setup:**
+            ```bash
+            chmod +x KevinNet_macOS_*
+            xattr -d com.apple.quarantine KevinNet_macOS_*
+            ```
 
             See [README.md](README.md) for full setup and usage instructions.
           files: |
             release_files/Windows-x64/KevinNet_Windows_x64.exe
             release_files/Windows-ARM64/KevinNet_Windows_ARM64.exe
             release_files/macOS-Universal/KevinNet_macOS_Universal
+            release_files/macOS-arm64/KevinNet_macOS_arm64
+            release_files/macOS-Intel/KevinNet_macOS_Intel
             release_files/Linux-x64/KevinNet_Linux_x64
             release_files/Linux-ARM64/KevinNet_Linux_ARM64
           draft: false

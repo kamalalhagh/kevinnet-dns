@@ -1,0 +1,237 @@
+name: Build All Platforms
+
+on:
+  push:
+    tags:
+      - "v*"          # triggers on version tags like v1.0.0
+  workflow_dispatch:  # allows manual trigger from GitHub Actions UI
+
+jobs:
+
+  # ── Windows x64 ────────────────────────────────────────────
+  windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          architecture: "x64"
+
+      - name: Install packages
+        run: python -m pip install dnspython pyinstaller pillow --upgrade --quiet
+
+      - name: Build EXE
+        run: |
+          $addData = ""
+          if (Test-Path "MasterDnsVPN.exe") { $addData += ' --add-data "MasterDnsVPN.exe;."' }
+          if (Test-Path "MasterDnsVPN")     { $addData += ' --add-data "MasterDnsVPN;."' }
+          $cmd = "python -m PyInstaller --onefile --windowed --name KevinNet_Windows_x64 --clean$addData kevinnet.py"
+          Invoke-Expression $cmd
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Windows-x64
+          path: dist/KevinNet_Windows_x64.exe
+
+  # ── Windows ARM64 ───────────────────────────────────────────
+  windows-arm64:
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install packages
+        run: python -m pip install dnspython pyinstaller pillow --upgrade --quiet
+
+      - name: Build EXE
+        run: |
+          $addData = ""
+          if (Test-Path "MasterDnsVPN.exe") { $addData += ' --add-data "MasterDnsVPN.exe;."' }
+          if (Test-Path "MasterDnsVPN")     { $addData += ' --add-data "MasterDnsVPN;."' }
+          $cmd = "python -m PyInstaller --onefile --windowed --name KevinNet_Windows_ARM64 --clean$addData kevinnet.py"
+          Invoke-Expression $cmd
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Windows-ARM64
+          path: dist/KevinNet_Windows_ARM64.exe
+
+  # ── macOS Universal (arm64 + x86_64) ───────────────────────
+  macos-universal:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ARM Python + deps
+        run: |
+          brew install python@3.12 python-tk@3.12
+          /opt/homebrew/opt/python@3.12/bin/python3.12 -m venv .venv_arm
+          .venv_arm/bin/pip install dnspython pyinstaller pillow --upgrade --quiet
+
+      - name: Install x86_64 Python + deps
+        run: |
+          # Download official universal/intel Python
+          curl -fsSL https://www.python.org/ftp/python/3.12.9/python-3.12.9-macos11.pkg \
+            -o /tmp/python_intel.pkg
+          sudo installer -pkg /tmp/python_intel.pkg -target /
+          /usr/local/bin/python3.12 -m venv .venv_x86
+          arch -x86_64 .venv_x86/bin/pip install dnspython pyinstaller pillow --upgrade --quiet
+
+      - name: Build ARM64
+        run: |
+          ADD_DATA=""
+          [ -f "MasterDnsVPN"     ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN:."
+          [ -f "MasterDnsVPN.exe" ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN.exe:."
+          .venv_arm/bin/python -m PyInstaller \
+            --onefile --name KevinNet_arm64 --clean \
+            $ADD_DATA kevinnet.py
+
+      - name: Build x86_64
+        run: |
+          ADD_DATA=""
+          [ -f "MasterDnsVPN"     ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN:."
+          [ -f "MasterDnsVPN.exe" ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN.exe:."
+          arch -x86_64 .venv_x86/bin/python -m PyInstaller \
+            --onefile --name KevinNet_x86_64 --clean \
+            $ADD_DATA kevinnet.py
+
+      - name: Extract from .app if needed
+        run: |
+          for ARCH in arm64 x86_64; do
+            if [ ! -f "dist/KevinNet_${ARCH}" ] && \
+               [ -d "dist/KevinNet_${ARCH}.app" ]; then
+              cp "dist/KevinNet_${ARCH}.app/Contents/MacOS/KevinNet_${ARCH}" \
+                 "dist/KevinNet_${ARCH}"
+            fi
+          done
+
+      - name: Combine Universal Binary
+        run: |
+          lipo -create \
+            dist/KevinNet_arm64 \
+            dist/KevinNet_x86_64 \
+            -output dist/KevinNet_macOS_Universal
+          echo "Architectures: $(lipo -archs dist/KevinNet_macOS_Universal)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macOS-Universal
+          path: dist/KevinNet_macOS_Universal
+
+  # ── Linux x64 ───────────────────────────────────────────────
+  linux-x64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system deps
+        run: sudo apt-get install -y python3-tk
+
+      - name: Install packages
+        run: python -m pip install dnspython pyinstaller pillow --upgrade --quiet
+
+      - name: Build binary
+        run: |
+          ADD_DATA=""
+          [ -f "MasterDnsVPN"     ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN:."
+          [ -f "MasterDnsVPN.exe" ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN.exe:."
+          python -m PyInstaller \
+            --onefile --windowed \
+            --name KevinNet_Linux_x64 \
+            --clean $ADD_DATA kevinnet.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Linux-x64
+          path: dist/KevinNet_Linux_x64
+
+  # ── Linux ARM64 ─────────────────────────────────────────────
+  linux-arm64:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install system deps
+        run: sudo apt-get install -y python3-tk
+
+      - name: Install packages
+        run: python -m pip install dnspython pyinstaller pillow --upgrade --quiet
+
+      - name: Build binary
+        run: |
+          ADD_DATA=""
+          [ -f "MasterDnsVPN"     ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN:."
+          [ -f "MasterDnsVPN.exe" ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN.exe:."
+          python -m PyInstaller \
+            --onefile --windowed \
+            --name KevinNet_Linux_ARM64 \
+            --clean $ADD_DATA kevinnet.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Linux-ARM64
+          path: dist/KevinNet_Linux_ARM64
+
+  # ── Create GitHub Release with all binaries ─────────────────
+  release:
+    needs: [windows-x64, windows-arm64, macos-universal, linux-x64, linux-arm64]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release_files/
+
+      - name: List release files
+        run: find release_files/ -type f
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "KevinNet DNS Config ${{ github.ref_name }}"
+          body: |
+            ## KevinNet DNS Config ${{ github.ref_name }}
+
+            Companion tool for [MasterDnsVPN](https://github.com/masterking32/MasterDnsVPN)
+            by [Kevin Haji](https://kevinhaji.com)
+
+            ### Download for your platform:
+
+            | Platform | File |
+            |---|---|
+            | 🪟 Windows x64 | `KevinNet_Windows_x64.exe` |
+            | 🪟 Windows ARM64 | `KevinNet_Windows_ARM64.exe` |
+            | 🍎 macOS Universal | `KevinNet_macOS_Universal` |
+            | 🐧 Linux x64 | `KevinNet_Linux_x64` |
+            | 🐧 Linux ARM64 | `KevinNet_Linux_ARM64` |
+
+            **macOS:** Right-click → Open → Open to bypass Gatekeeper.
+            **Linux:** Run `chmod +x KevinNet_Linux_*` first.
+
+            See [README.md](README.md) for full setup and usage instructions.
+          files: |
+            release_files/Windows-x64/KevinNet_Windows_x64.exe
+            release_files/Windows-ARM64/KevinNet_Windows_ARM64.exe
+            release_files/macOS-Universal/KevinNet_macOS_Universal
+            release_files/Linux-x64/KevinNet_Linux_x64
+            release_files/Linux-ARM64/KevinNet_Linux_ARM64
+          draft: false
+          prerelease: false

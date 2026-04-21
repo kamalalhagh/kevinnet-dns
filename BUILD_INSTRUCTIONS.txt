@@ -1,0 +1,407 @@
+================================================================================
+  KevinNet DNS Config — Build Instructions
+  by Kevin Haji | kevinhaji.com | kevin.fullstack.dev@gmail.com
+================================================================================
+
+ACKNOWLEDGEMENT & CREDITS
+--------------------------------------------------------------------------------
+This app uses MasterDnsVPN as the underlying VPN client.
+
+  MasterDnsVPN is developed by MasterkinG32
+  GitHub:  https://github.com/masterking32/MasterDnsVPN
+
+  All credit for the VPN client goes to MasterkinG32 and contributors.
+  This config generator is a companion tool to make it easier to find
+  working DNS resolvers and set up MasterDnsVPN — especially for users
+  inside Iran.
+
+  Thank you to MasterkinG32 (Amin Mahmoudi) for building and open-sourcing
+  MasterDnsVPN under the MIT License.
+
+  MasterDnsVPN is distributed under the MIT License:
+  -------------------------------------------------------
+  MIT License
+  Copyright (c) 2026 Amin Mahmoudi
+
+  Permission is hereby granted, free of charge, to any person obtaining a
+  copy of this software and associated documentation files (the "Software"),
+  to deal in the Software without restriction, including without limitation
+  the rights to use, copy, modify, merge, publish, distribute, sublicense,
+  and/or sell copies of the Software, and to permit persons to whom the
+  Software is furnished to do so, subject to the following conditions:
+
+  The above copyright notice and this permission notice shall be included
+  in all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS
+  OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+  CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+  TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+  -------------------------------------------------------
+
+  MIT License summary — what this means for YOU:
+    ✓  You may bundle MasterDnsVPN inside your compiled app
+    ✓  You may distribute your app (free or paid) to customers
+    ✓  You may publish your project publicly on GitHub
+    ✓  You may modify and automate it
+    ✓  The only requirement: keep the copyright notice above included
+       (which this README already satisfies)
+
+DOWNLOAD MASTERDNSVPN CLIENT
+--------------------------------------------------------------------------------
+Before building, download the correct MasterDnsVPN binary for your platform
+from the official releases page:
+
+  All releases:
+    https://github.com/masterking32/MasterDnsVPN/releases
+
+  Direct downloads:
+
+    Windows (AMD64 / x64):
+      https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_Windows_AMD64.zip
+
+    Windows (ARM64):
+      https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_Windows_ARM64.zip
+
+    macOS (AMD64 / Intel):
+      https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_MacOS_AMD64.zip
+
+  After downloading, extract the zip and rename the binary:
+    Windows  → MasterDnsVPN.exe
+    macOS    → MasterDnsVPN
+
+  Place both files in your build folder alongside kevinnet.py.
+  They will be bundled INSIDE the compiled app automatically.
+
+  NOTE: There is currently no official ARM64 macOS build from MasterkinG32.
+  For Apple Silicon Macs, use the AMD64 build — it runs under Rosetta 2.
+
+--------------------------------------------------------------------------------
+
+This document explains how to build the app on macOS and Windows.
+The output is a standalone executable that requires no Python installation
+on the end user's machine.
+
+--------------------------------------------------------------------------------
+  FILES NEEDED IN YOUR BUILD FOLDER
+--------------------------------------------------------------------------------
+
+Before building, make sure all these files are in the SAME folder:
+
+  kevinnet.py     ← the main app (this file)
+  MasterDnsVPN                ← the MasterDNS binary for macOS/Linux
+  MasterDnsVPN.exe            ← the MasterDNS binary for Windows
+  build_mac_universal.sh      ← build script for macOS
+  build_windows.bat           ← build script for Windows
+
+The MasterDnsVPN binaries are bundled INSIDE the compiled app automatically.
+Your customers do NOT need to download them separately.
+
+--------------------------------------------------------------------------------
+  BUILD ON macOS (Universal — works on Intel AND Apple Silicon)
+--------------------------------------------------------------------------------
+
+REQUIREMENTS:
+  - Apple Silicon Mac (M1, M2, M3, M4)
+  - Xcode Command Line Tools
+  - Homebrew
+  - Internet connection (first run only)
+
+STEP 1 — Install Xcode Command Line Tools (if not already installed)
+
+  Open Terminal and run:
+    xcode-select --install
+
+  A popup will appear. Click Install and wait for it to finish (~5 min).
+  Skip this step if you already have it installed.
+
+STEP 2 — Install Homebrew (if not already installed)
+
+  Run in Terminal:
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+  Follow the instructions on screen. At the end it will tell you to run
+  two commands to add brew to your PATH — run those too.
+
+STEP 3 — Install ARM Python and Tkinter via Homebrew
+
+  Run in Terminal:
+    brew install python@3.12 python-tk@3.12
+
+  This installs a native Apple Silicon Python with Tkinter support.
+  The system Python on macOS does NOT include Tkinter.
+
+STEP 4 — Create a virtual environment (venv)
+
+  Navigate to your build folder in Terminal:
+    cd ~/Downloads/MasterDNSVPN
+
+  Create the venv using the Homebrew Python:
+    /opt/homebrew/opt/python@3.12/bin/python3.12 -m venv venv
+
+  Activate it:
+    source venv/bin/activate
+
+  You should see (venv) appear at the start of your Terminal prompt.
+
+STEP 5 — Install required Python packages inside the venv
+
+  With the venv activated, run:
+    pip install dnspython pyinstaller pillow
+
+  Wait for all packages to install. You only need to do this once.
+
+STEP 6 — Run the build script
+
+  Make the script executable (first time only):
+    chmod +x build_mac_universal.sh
+
+  Run it:
+    ./build_mac_universal.sh
+
+  The script will:
+    1. Check for Rosetta 2 (installs automatically if missing)
+    2. Find or install Intel (x86_64) Python automatically
+    3. Install packages for both architectures
+    4. Build ARM64 binary
+    5. Build x86_64 binary
+    6. Combine both into a Universal Binary using lipo
+    7. Open the dist/ folder when done
+
+STEP 7 — Your output
+
+  dist/KevinNet
+
+  This single file runs on ALL Macs — both Intel and Apple Silicon.
+  Send this one file to all your Mac customers.
+
+IMPORTANT NOTES FOR macOS:
+  - Do NOT run the build script from inside a venv (the script creates
+    its own isolated venvs internally).
+  - First build takes 10-15 minutes (installing Rosetta + Intel Python).
+  - Subsequent builds take 3-5 minutes.
+  - If macOS shows "cannot be opened because the developer cannot be
+    verified", customers should right-click → Open → Open to bypass it.
+    Or you can code-sign with an Apple Developer certificate.
+
+--------------------------------------------------------------------------------
+  BUILD ON Windows (x64)
+--------------------------------------------------------------------------------
+
+REQUIREMENTS:
+  - Windows 10 or 11
+  - Python 3.10 or newer (from python.org, NOT Microsoft Store)
+  - Internet connection
+
+STEP 1 — Install Python correctly
+
+  Download Python from:  https://www.python.org/downloads/windows/
+  Choose:  Windows installer (64-bit)
+
+  IMPORTANT during installation:
+    - Check the box "Add Python to PATH"  ← this is critical
+    - Click "Install Now"
+
+  If you already have Python but it came from the Microsoft Store,
+  uninstall it and reinstall from python.org. The Store version
+  has known issues with PyInstaller.
+
+STEP 2 — Create a virtual environment (venv)
+
+  Open Command Prompt (search "cmd" in Start menu):
+    cd C:\Users\YourName\Downloads\MasterDNSVPN
+
+  Create the venv:
+    python -m venv venv
+
+  Activate it:
+    venv\Scripts\activate
+
+  You should see (venv) appear at the start of your prompt.
+
+STEP 3 — Install required Python packages
+
+  With the venv activated, run:
+    pip install dnspython pyinstaller pillow
+
+STEP 4 — Run the build script
+
+  Simply double-click build_windows.bat
+
+  OR run it from your already-open Command Prompt:
+    build_windows.bat
+
+  The script will:
+    1. Verify Python is installed
+    2. Install/update dnspython and PyInstaller
+    3. Build the EXE with MasterDnsVPN.exe bundled inside
+    4. Clean up build files
+    5. Open the dist\ folder when done
+
+  NOTE: Do NOT run as Administrator. PyInstaller blocks admin mode.
+  Just double-click normally.
+
+STEP 5 — Your output
+
+  dist\KevinNet.exe
+
+  Send this file to your Windows customers.
+  They can run it directly — no Python needed.
+
+IMPORTANT NOTES FOR Windows:
+  - Windows Defender or antivirus may flag the EXE as suspicious.
+    This is a false positive common with PyInstaller apps.
+    You can add the dist\ folder to your antivirus whitelist.
+  - If the build window closes immediately, open a Command Prompt
+    manually, navigate to the folder, and run: build_windows.bat
+    This way you can read any error messages.
+
+--------------------------------------------------------------------------------
+  BUILD ON Windows (ARM64) — for Surface Pro X, Snapdragon PCs
+--------------------------------------------------------------------------------
+
+STEP 1 — Download ARM64 Python from python.org
+  https://www.python.org/downloads/windows/
+  Choose: Windows ARM64 installer
+
+  Install to a DIFFERENT folder than your x64 Python.
+  Example: C:\Python312-arm64\
+
+STEP 2 — Create venv with ARM Python
+  C:\Python312-arm64\python.exe -m venv venv_arm
+  venv_arm\Scripts\activate
+
+STEP 3 — Install packages and build
+  pip install dnspython pyinstaller pillow
+  python -m PyInstaller --onefile --windowed --name "KevinNet_ARM64" --add-data "MasterDnsVPN.exe;." --add-data "MasterDnsVPN;." --clean kevinnet.py
+
+Output: dist\KevinNet_ARM64.exe
+
+--------------------------------------------------------------------------------
+  BUILD ON Linux (x64)
+--------------------------------------------------------------------------------
+
+STEP 1 — Install dependencies
+  sudo apt update
+  sudo apt install python3 python3-pip python3-venv python3-tk
+
+STEP 2 — Create venv and install packages
+  cd ~/MasterDNSVPN
+  python3 -m venv venv
+  source venv/bin/activate
+  pip install dnspython pyinstaller pillow
+
+STEP 3 — Build
+  bash build_mac_linux.sh
+
+  OR manually:
+  pyinstaller --onefile --windowed --name "KevinNet" \
+    --add-data "MasterDnsVPN:." --add-data "MasterDnsVPN.exe:." \
+    --clean kevinnet.py
+
+Output: dist/KevinNet
+
+--------------------------------------------------------------------------------
+  AUTOMATED BUILD FOR ALL PLATFORMS — GitHub Actions (Recommended)
+--------------------------------------------------------------------------------
+
+If you want to build for ALL platforms automatically without needing
+different machines, use GitHub Actions (free):
+
+STEP 1 — Create a free account at github.com
+
+STEP 2 — Create a new repository (can be private)
+
+STEP 3 — Upload these files to the repository:
+  kevinnet.py
+  MasterDnsVPN
+  MasterDnsVPN.exe
+  .github/workflows/build.yml   ← included in your package
+
+STEP 4 — GitHub automatically builds for:
+  Windows x64    → KevinNet_Windows_x64.exe
+  Windows ARM64  → KevinNet_Windows_ARM64.exe
+  macOS Universal (Intel + Apple Silicon) → KevinNet_macOS_Universal
+  Linux x64      → KevinNet_Linux_x64
+  Linux ARM64    → KevinNet_Linux_ARM64
+
+STEP 5 — Download built files:
+  GitHub website → Actions tab → Latest run → Artifacts section
+  Download the file for each platform.
+
+This is the recommended approach for distributing to all platforms
+without needing multiple machines.
+
+--------------------------------------------------------------------------------
+  WHAT THE APP DOES (for your reference when explaining to customers)
+--------------------------------------------------------------------------------
+
+The app scans for DNS resolvers that work with MasterDNSVPN in Iran:
+
+  Phase 1: Quick scan — tests ~60,000 Iranian IP addresses to find
+           open DNS resolvers (typically takes 5-8 minutes)
+
+  Phase 2: Deep 6-check — scores each alive resolver 0-6 based on:
+           NS→A, TXT, RND, DPI, EDNS, NXD tests
+           All resolvers shown regardless of score
+
+  Phase 3: E2E verify — pipes resolvers through the real MasterDNS
+           binary to test actual tunnel connection (the final filter)
+
+  Save: Writes client_config.toml and client_resolvers.txt
+        (and copies MasterDnsVPN binary) to a folder named after
+        the country, next to the app itself.
+
+  Connect: Launches MasterDnsVPN from the saved folder in a terminal.
+
+Customer usage:
+  1. Enter tunnel domain (e.g. v.example.com)
+  2. Enter encryption key (32-char, must match server)
+  3. Enter country name (e.g. Iran)
+  4. Click Start Scan — wait ~10-15 minutes
+  5. Click Save Config Files
+  6. Click Connect MasterDNSVPN
+
+--------------------------------------------------------------------------------
+  TROUBLESHOOTING
+--------------------------------------------------------------------------------
+
+macOS: "python3-tk" not found after brew install
+  Try: brew reinstall python-tk@3.12
+  Or:  brew install tcl-tk
+
+macOS: App shows "damaged" or won't open
+  Run in Terminal: xattr -cr /path/to/KevinNet
+  This removes the quarantine attribute.
+
+Windows: "pip is not recognized"
+  Python was not added to PATH during installation.
+  Reinstall Python and check "Add Python to PATH".
+
+Windows: Build fails with "access denied"
+  Do not run as Administrator.
+  Make sure no antivirus is blocking PyInstaller.
+
+Windows: EXE flagged by antivirus
+  This is a PyInstaller false positive. Add to exclusions.
+  VirusTotal typically shows 2-5 false positives for clean PyInstaller apps.
+
+General: "dnspython not installed" at runtime
+  Run: pip install dnspython
+  Make sure your venv is activated.
+
+General: App opens but scan finds 0 results
+  - Check your domain is correct
+  - Make sure your MasterDNS server is running
+  - Try increasing the timeout to 5 seconds
+  - Lower concurrency to 50 if on a slow connection
+
+================================================================================
+  Kevin Haji | kevinhaji.com | kevin.fullstack.dev@gmail.com
+
+  MasterDnsVPN by MasterkinG32
+  https://github.com/masterking32/MasterDnsVPN
+================================================================================

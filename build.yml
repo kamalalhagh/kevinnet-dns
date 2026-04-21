@@ -121,19 +121,38 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: macOS-arm64-bin
-          path: bins/
+          path: bins/arm64/
       - name: Download x86_64 binary
         uses: actions/download-artifact@v4
         with:
           name: macOS-x86-bin
-          path: bins/
-      - name: Combine Universal Binary
+          path: bins/x86/
+      - name: Verify and Combine Universal Binary
         run: |
-          chmod +x bins/KevinNet_arm64 bins/KevinNet_x86_64
-          lipo -create bins/KevinNet_arm64 bins/KevinNet_x86_64 \
-            -output bins/KevinNet_macOS_Universal
-          echo "Architectures: $(lipo -archs bins/KevinNet_macOS_Universal)"
-          ls -lh bins/
+          echo "=== Downloaded files ==="
+          find bins/ -type f | sort
+          chmod +x bins/arm64/KevinNet_arm64 bins/x86/KevinNet_x86_64
+
+          echo "=== Verify arm64 arch ==="
+          lipo -archs bins/arm64/KevinNet_arm64
+
+          echo "=== Verify x86_64 arch ==="
+          lipo -archs bins/x86/KevinNet_x86_64
+
+          echo "=== Combining ==="
+          lipo -create             bins/arm64/KevinNet_arm64             bins/x86/KevinNet_x86_64             -output bins/KevinNet_macOS_Universal
+
+          echo "=== Final binary archs (MUST show both) ==="
+          lipo -archs bins/KevinNet_macOS_Universal
+
+          # Fail the build if both slices are not present
+          ARCHS=$(lipo -archs bins/KevinNet_macOS_Universal)
+          if [[ "$ARCHS" != *"arm64"* ]] || [[ "$ARCHS" != *"x86_64"* ]]; then
+            echo "ERROR: Universal binary is missing a slice! Got: $ARCHS"
+            exit 1
+          fi
+          echo "SUCCESS: Universal binary contains both arm64 and x86_64"
+          ls -lh bins/KevinNet_macOS_Universal
       - uses: actions/upload-artifact@v4
         with:
           name: macOS-Universal

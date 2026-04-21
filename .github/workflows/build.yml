@@ -82,29 +82,33 @@ jobs:
           name: macOS-arm64
           path: dist/KevinNet_macOS_arm64
 
-  # ── macOS Intel (x86_64) ─────────────────────────────────────
+  # ── macOS Intel (x86_64) via Rosetta on arm64 runner ─────────
+  # Using macos-latest (arm64) + Rosetta is much faster than macos-13
   macos-intel:
-    runs-on: macos-13
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install Python x86_64 + deps
+      - name: Enable Rosetta
+        run: softwareupdate --install-rosetta --agree-to-license || true
+      - name: Install Intel (x86_64) Python via Rosetta Homebrew
         run: |
-          brew install python@3.12 python-tk@3.12
-          python3.12 -m venv .venv
-          .venv/bin/pip install dnspython pyinstaller pillow --upgrade --quiet
-      - name: Build x86_64 binary
+          # Install Homebrew for x86_64 under Rosetta
+          if [ ! -f /usr/local/bin/brew ]; then
+            arch -x86_64 /bin/bash -c               "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          fi
+          arch -x86_64 /usr/local/bin/brew install python@3.12 python-tk@3.12
+          arch -x86_64 /usr/local/opt/python@3.12/bin/python3.12 -m venv .venv_intel
+          arch -x86_64 .venv_intel/bin/pip install dnspython pyinstaller pillow --upgrade --quiet
+      - name: Build x86_64 binary via Rosetta
         run: |
           ADD_DATA=""
           [ -f "MasterDnsVPN"     ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN:."
           [ -f "MasterDnsVPN.exe" ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN.exe:."
-          .venv/bin/python -m PyInstaller \
-            --onefile --name KevinNet_x86_64 --clean \
-            $ADD_DATA kevinnet.py
+          arch -x86_64 .venv_intel/bin/python -m PyInstaller             --onefile --name KevinNet_x86_64 --clean             $ADD_DATA kevinnet.py
           if [ ! -f "dist/KevinNet_x86_64" ] && [ -d "dist/KevinNet_x86_64.app" ]; then
             cp "dist/KevinNet_x86_64.app/Contents/MacOS/KevinNet_x86_64" "dist/KevinNet_x86_64"
           fi
           echo "=== x86_64 arch ===" && lipo -archs dist/KevinNet_x86_64
-          # copy with final name too
           cp dist/KevinNet_x86_64 dist/KevinNet_macOS_Intel
       - uses: actions/upload-artifact@v4
         with:

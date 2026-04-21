@@ -3345,32 +3345,40 @@ def run_e2e_verify(found_ips: list, domain: str, timeout_s: float,
 # ═══════════════════════════════════════════════════════════════
 #  DESIGN TOKENS
 # ═══════════════════════════════════════════════════════════════
-BG     = "#0f1117"       # deep navy-black background
-PANEL  = "#161b27"       # slightly lighter for top bar / footer
-CARD   = "#1a2035"       # card surfaces
-BORDER = "#2a3650"       # subtle borders
-ACCENT = "#00d4aa"       # teal-green — scan button
-BLUE   = "#4f8ef7"       # blue — save button
-GREEN  = "#34d399"       # emerald — found / success
-WARN   = "#fbbf24"       # amber — scanning state
-DANGER = "#f87171"       # soft red — stop button
-TEXT   = "#f0f4ff"       # near-white text
-MUTED  = "#8899bb"       # muted blue-grey labels
-INPUT  = "#111827"       # input field background
-# Button foreground colours — picked per-button for max contrast
-SCAN_FG  = "#000000"    # black text on all buttons
-STOP_FG  = "#000000"    # black text on all buttons
-SAVE_FG  = "#000000"    # black text on all buttons
-CLEAR_FG = "#000000"    # black text on all buttons
-BTN_FG   = "#000000"    # black text
+# ═══════════════════════════════════════════════════════════════
+#  DESIGN TOKENS — warm, modern, user-friendly palette
+# ═══════════════════════════════════════════════════════════════
+BG     = "#1a1f2e"       # deep navy — easy on eyes
+PANEL  = "#141824"       # top bar / footer
+CARD   = "#212840"       # card surfaces
+BORDER = "#2e3a54"       # borders
+ACCENT = "#00c9a7"       # teal — scan button
+BLUE   = "#5b8ff9"       # periwinkle — save button
+GREEN  = "#2ecc71"       # vivid green — success
+WARN   = "#f5a623"       # amber — scanning
+DANGER = "#e74c3c"       # red — stop
+PURPLE = "#7c3aed"       # purple — connect / e2e verified
+TEXT   = "#eef2ff"       # near-white
+MUTED  = "#7b8db5"       # cool grey labels
+INPUT  = "#0f1320"       # input background
+HINT   = "#4e5f80"       # secondary hint text
 
-# Disabled button styles — clear bg + readable light text
-DIS_BG   = "#1e2535"    # neutral dark — same for all disabled buttons
-DIS_FG   = "#5a6a88"    # muted blue-grey text — clearly "off" but readable
+# All button text is always pure black — max readability on any bg
+BTN_TEXT = "#000000"
+SCAN_FG  = "#000000"
+STOP_FG  = "#000000"
+SAVE_FG  = "#000000"
+CLEAR_FG = "#000000"
+BTN_FG   = "#000000"
 
-# Active connect button
-CONN_BG  = "#059669"
-CONN_DIS = "#0d2a1f"    # dark green when disabled
+# Disabled state — clearly off but still readable
+DIS_BG   = "#252d42"
+DIS_FG   = "#4a5a7a"
+
+# Legacy aliases kept for compatibility
+CONN_BG  = PURPLE
+CONN_DIS = "#1a0a3a"
+
 
 def F(size=11, weight="normal"):
     for fam in ("Segoe UI","SF Pro Display","Helvetica Neue","Ubuntu","Arial"):
@@ -3524,7 +3532,7 @@ class App(tk.Tk):
         super().__init__()
         self.title("KevinNet DNS")
         self.configure(bg=BG)
-        self.minsize(1100, 800)
+        self.minsize(900, 680)   # minimum — all buttons always visible
 
         self._lang      = "fa"
         self._found_ips : list[str] = []
@@ -3638,10 +3646,12 @@ class App(tk.Tk):
         topbar.pack(fill="x")
         topbar.pack_propagate(False)
 
-        tk.Label(topbar, text="● MasterDNSVPN", bg=PANEL, fg=ACCENT,
-                 font=F(17, "bold")).pack(side="left", padx=20)
-        tk.Label(topbar, text="KevinNet DNS  ·  by Kevin Haji", bg=PANEL, fg=MUTED,
+        tk.Label(topbar, text="KevinNet DNS", bg=PANEL, fg=ACCENT,
+                 font=F(18, "bold")).pack(side="left", padx=(20, 8))
+        tk.Label(topbar, text="·  DNS Resolver Scanner", bg=PANEL, fg=MUTED,
                  font=F(11)).pack(side="left")
+        tk.Label(topbar, text="by Kevin Haji", bg=PANEL, fg=HINT,
+                 font=F(10)).pack(side="left", padx=(10,0))
 
         btn_fr = tk.Frame(topbar, bg=PANEL)
         btn_fr.pack(side="right", padx=16)
@@ -3673,9 +3683,46 @@ class App(tk.Tk):
         body = tk.Frame(self, bg=BG)
         body.pack(fill="both", expand=True)
 
-        left = tk.Frame(body, bg=BG, width=400)
-        left.pack(side="left", fill="y", padx=(16, 8), pady=14)
-        left.pack_propagate(False)
+        # Scrollable left panel — buttons always accessible even on small screens
+        left_outer = tk.Frame(body, bg=BG, width=420)
+        left_outer.pack(side="left", fill="y", padx=(12, 6), pady=10)
+        left_outer.pack_propagate(False)
+
+        left_canvas = tk.Canvas(left_outer, bg=BG, bd=0,
+                                highlightthickness=0, width=400)
+        left_scroll = ttk.Scrollbar(left_outer, orient="vertical",
+                                    command=left_canvas.yview)
+        left_scroll.pack(side="right", fill="y")
+        left_canvas.pack(side="left", fill="both", expand=True)
+
+        left = tk.Frame(left_canvas, bg=BG)
+        left_win = left_canvas.create_window((0, 0), window=left,
+                                              anchor="nw", width=395)
+
+        def _on_left_configure(e):
+            left_canvas.configure(scrollregion=left_canvas.bbox("all"))
+        def _on_canvas_resize(e):
+            left_canvas.itemconfig(left_win, width=e.width)
+        left.bind("<Configure>", _on_left_configure)
+        left_canvas.bind("<Configure>", _on_canvas_resize)
+
+        # Mouse wheel scroll
+        def _on_mousewheel(e):
+            if sys.platform == "darwin":
+                left_canvas.yview_scroll(-1 * int(e.delta), "units")
+            elif sys.platform == "win32":
+                left_canvas.yview_scroll(-1 * int(e.delta / 120), "units")
+            else:
+                if e.num == 4:
+                    left_canvas.yview_scroll(-1, "units")
+                else:
+                    left_canvas.yview_scroll(1, "units")
+
+        left_canvas.bind("<MouseWheel>", _on_mousewheel)
+        left_canvas.bind("<Button-4>",   _on_mousewheel)
+        left_canvas.bind("<Button-5>",   _on_mousewheel)
+        left.bind("<MouseWheel>",        _on_mousewheel)
+
         self._build_left(left)
 
         right = tk.Frame(body, bg=BG)
@@ -3750,17 +3797,20 @@ class App(tk.Tk):
         self._domain_var  = entry_field(
             c1, "domain_lbl",  "domain_ent",  "domain_hint",
             "Tunnel Domain",   "دامنه تانل",
-            "e.g.  v.example.com", "مثال:  v.example.com")
+            "subdomain pointing to your server  e.g. v.example.com",
+            "ساب‌دامین که به سرور اشاره دارد  مثال: v.example.com")
 
         self._key_var = entry_field(
             c1, "key_lbl", "key_ent", "key_hint",
             "Encryption Key",  "کلید رمزنگاری",
-            "32-char key",     "کلید ۳۲ کاراکتری")
+            "32-char key from server  (encrypt_key.txt)",
+            "کلید ۳۲ کاراکتری از سرور  (فایل encrypt_key.txt)")
 
         self._country_var = entry_field(
             c1, "country_lbl", "country_ent", "country_hint",
             "Country / Folder", "نام کشور / پوشه",
-            "e.g.  Iran",       "مثال:  Iran")
+            "output folder name  e.g. Iran  Turkey  etc.",
+            "نام پوشه خروجی  مثال: Iran  Turkey")
 
         tk.Frame(c1, bg=CARD, height=10).pack()
 
@@ -3811,24 +3861,29 @@ class App(tk.Tk):
         bf.pack(fill="x", pady=(2, 0))
 
         def mk_btn(wkey, en, pfa, bg_c, fg_c, cmd, state="normal"):
-            # Darken bg for disabled state so it looks clearly inactive
-            import colorsys
-            b = tk.Button(bf,
+            act_bg = bg_c if state == "normal" else DIS_BG
+            act_fg = BTN_TEXT if state == "normal" else DIS_FG
+            wrapper = tk.Frame(bf, bg=BG)
+            wrapper.pack(fill="x", pady=(0, 5))
+            b = tk.Button(wrapper,
                           text=pfa if fa else en,
-                          bg=bg_c, fg=fg_c,
+                          bg=act_bg, fg=act_fg,
                           font=FA(12, "bold") if fa else F(12, "bold"),
-                          relief="flat", bd=0, pady=12, cursor="hand2",
+                          relief="flat", bd=0,
+                          padx=18, pady=11,
+                          cursor="hand2" if state == "normal" else "arrow",
                           state=state,
-                          activebackground=bg_c, activeforeground=fg_c,
-                          disabledforeground="#3a4a6a",
+                          activebackground=bg_c,
+                          activeforeground=BTN_TEXT,
+                          disabledforeground=DIS_FG,
                           command=cmd)
-            b.pack(fill="x", pady=(0, 6))
+            b.pack(fill="x", padx=2)
             W[wkey] = b
 
         mk_btn("btn_scan",    "▶  Start Scan",           "▶  شروع اسکن",           ACCENT,    SCAN_FG, self._start_scan)
         mk_btn("btn_stop",    "■  Stop",                  "■  توقف",                DANGER,    "#000000", self._stop_scan,    "disabled")
         mk_btn("btn_save",    "💾  Save Config Files",    "💾  ذخیره فایل‌ها",      BLUE,      SAVE_FG, self._save_configs, "disabled")
-        mk_btn("btn_connect", "🚀  Connect MasterDNSVPN", "🚀  اتصال MasterDNSVPN", CONN_BG, "white", self._launch_vpn,   "disabled")
+        mk_btn("btn_connect", "🚀  Connect MasterDNSVPN", "🚀  اتصال MasterDNSVPN", PURPLE, BTN_TEXT, self._launch_vpn,   "disabled")
         mk_btn("btn_clear",   "🗑  Clear",                 "🗑  پاک کردن",            BORDER,    CLEAR_FG,self._clear)
 
     # ── RIGHT PANEL ─────────────────────────────────────────────
@@ -3842,15 +3897,18 @@ class App(tk.Tk):
                                   bg=BG, fg=MUTED, font=F(10))
         W["prog_lbl"].pack(side="left")
         W["badge"] = tk.Label(prog_top, text="0  found",
-                               bg=GREEN, fg="#052e16",
-                               font=F(10, "bold"), padx=10, pady=3)
+                               bg=CARD, fg=GREEN,
+                               font=F(10, "bold"), padx=12, pady=4,
+                               relief="flat",
+                               highlightbackground=GREEN,
+                               highlightthickness=1)
         W["badge"].pack(side="right")
 
         style = ttk.Style()
         style.theme_use("default")
         style.configure("G.Horizontal.TProgressbar",
                         troughcolor=BORDER, background=ACCENT,
-                        bordercolor=BORDER, thickness=10,
+                        bordercolor=BORDER, thickness=14,
                         lightcolor=ACCENT, darkcolor=ACCENT)
         W["progress"] = ttk.Progressbar(parent,
                                          style="G.Horizontal.TProgressbar",
@@ -3870,17 +3928,22 @@ class App(tk.Tk):
                                  font=F(10, "bold"), padx=12, pady=6,
                                  anchor="w")
         W["res_hdr"].pack(side="left", fill="x", expand=True)
+        W["res_count"] = tk.Label(res_hdr_fr, text="",
+                                   bg=BORDER, fg=MUTED,
+                                   font=F(9), padx=10, pady=6)
+        W["res_count"].pack(side="right")
 
         style.configure("R.Treeview",
                         background=CARD, foreground=TEXT,
-                        fieldbackground=CARD, rowheight=30,
-                        font=FM(11))
+                        fieldbackground=CARD, rowheight=32,
+                        font=FM(11),
+                        borderwidth=0, relief="flat")
         style.configure("R.Treeview.Heading",
                         background="#0d1526", foreground=ACCENT,
-                        font=F(10, "bold"))
+                        font=F(10, "bold"), padding=(8, 6))
         style.map("R.Treeview",
-                  background=[("selected", "#1a3a5c")],
-                  foreground=[("selected", TEXT)])
+                  background=[("selected", "#1e3a60")],
+                  foreground=[("selected", "#ffffff")])
 
         tv_fr = tk.Frame(res, bg=CARD)
         tv_fr.pack(fill="both", expand=True)
@@ -3957,6 +4020,14 @@ class App(tk.Tk):
         ]:
             W[wlbl].config(text=fa_t if fa else en_t, font=ff(9))
 
+        h_fa = "پیشنهاد ایران: Target=100  Concurrency<=80  Timeout=3s  Pool=200-500\n"                "Resolver kam? Pool raa bala bebrid ya eskan chand bar ejra konid"
+        h_en = "Iran recommended: Target=100  Concurrency<=80  Timeout=3s  Pool=200-500\n"                "Finding few resolvers? Increase Pool or run scan multiple times"
+        if "scan_hint" in W:
+            W["scan_hint"].config(text=h_fa if fa else h_en, font=ff(8))
+        if "log_hdr_lbl" in W:
+            W["log_hdr_lbl"].config(text="📋  گزارش فعالیت" if fa else "📋  Activity Log",
+                                    font=ff(10, "bold"))
+
         for wkey, fa_t, en_t in [
             ("btn_scan",    "▶  شروع اسکن",           "▶  Start Scan"),
             ("btn_stop",    "■  توقف",                "■  Stop"),
@@ -3974,9 +4045,21 @@ class App(tk.Tk):
 
     # ── LOG ─────────────────────────────────────────────────────
     def _log(self, msg):
-        log = self._W["log"]
+        log = self._W.get("log")
+        if not log:
+            return
+        ts   = datetime.now().strftime("%H:%M:%S")
+        line = f"[{ts}]  {msg}\n"
+        if   msg.startswith("★"):                                    tag = "star"
+        elif msg.startswith("◆"):                                    tag = "diamond"
+        elif msg.startswith("▸"):                                    tag = "arrow"
+        elif any(x in msg for x in ("⚠","ERROR","error","خطا")):    tag = "warn"
+        elif any(x in msg for x in ("E2E","Phase 3","مرحله ۳","تأیید E2E")): tag = "e2e"
+        elif any(x in msg for x in ("Saved","ذخیره","copied","کپی","SUCCESS","SUCCESS")): tag = "star"
+        elif any(x in msg for x in ("Phase","مرحله","Pool","Settings","تنظیمات","پایگاه")): tag = "info"
+        else:                                                         tag = "muted"
         log.config(state="normal")
-        log.insert("end", f"[{datetime.now().strftime('%H:%M:%S')}]  {msg}\n")
+        log.insert("end", line, tag)
         log.see("end")
         log.config(state="disabled")
 
@@ -4113,6 +4196,10 @@ class App(tk.Tk):
     def _on_result(self, ip, score, max_score, ms, detail_str):
         fa = self._lang == "fa"
         self._found_ips.append(ip)
+        n = len(self._found_ips)
+        if "res_count" in self._W:
+            self._W["res_count"].config(
+                text=f"{n} {'یافت‌شده' if fa else 'found'}")
         # Color by score — all shown, sorted visually
         if score == 6:
             tag, icon = "s6", "★"   # bright green  — perfect

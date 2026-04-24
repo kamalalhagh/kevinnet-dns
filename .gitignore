@@ -1,35 +1,79 @@
-# Python
+# ── Python ────────────────────────────────────────────────────
 __pycache__/
-*.pyc
+*.py[cod]
 *.pyo
 *.pyd
 .Python
 *.egg
 *.egg-info/
+
+# ── PyInstaller ───────────────────────────────────────────────
 dist/
 build/
 *.spec
+
+# ── Virtual environments ──────────────────────────────────────
 venv/
 .venv*/
 env/
+ENV/
+.venv_arm64/
+.venv_x86_64/
+.venv_intel/
+.venv_arm/
+.venv_x86/
 
-# PyInstaller output
-dist/
-build/
-
-# macOS
+# ── macOS ─────────────────────────────────────────────────────
 .DS_Store
 .AppleDouble
 .LSOverride
+._*
+.Spotlight-V100
+.Trashes
 
-# Windows
+# ── Windows ───────────────────────────────────────────────────
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+$RECYCLE.BIN/
 
-# Logs
+# ── Linux ─────────────────────────────────────────────────────
+*~
+.fuse_hidden*
+.Trash-*
+
+# ── IDE / editors ─────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*.sublime-project
+*.sublime-workspace
+
+# ── Logs ──────────────────────────────────────────────────────
 logs/
 *.log
 
-# Local config
-local.properties
+# ── App output folders (country config folders) ───────────────
+Iran/
+Turkey/
+UAE/
+Germany/
+Netherlands/
+USA/
+UK/
+*/client_config.toml
+*/client_resolvers.txt
+
+# ── Local secrets — never commit ──────────────────────────────
+encrypt_key.txt
+*.key
+*.pem
+*.env
+.env.*
+
+# ── Temp build files ──────────────────────────────────────────
+*.tmp
+*.bak
+*.orig
+*.pkg

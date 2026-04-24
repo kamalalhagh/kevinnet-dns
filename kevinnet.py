@@ -60,34 +60,21 @@ def get_masterdns_exe() -> Path | None:
     """
     Find the MasterDnsVPN binary.
     Priority:
-      1. Next to the .exe / app (already extracted or placed by user)
-      2. Inside PyInstaller _MEIPASS → copy to app_dir() so it persists
-      3. Next to the .py script (dev mode)
+      1. Inside PyInstaller _MEIPASS (bundled) — returned as-is, NOT copied to app_dir
+      2. Next to the .py script (dev/source mode)
+    NOTE: we intentionally do NOT copy to app_dir() — the binary only
+    goes into the country folder during _save_configs(), nowhere else.
     """
     fname = "MasterDnsVPN.exe" if sys.platform == "win32" else "MasterDnsVPN"
 
-    # 1. Already sitting next to the compiled app
-    local = app_dir() / fname
-    if local.exists():
-        return local
-
-    # 2. Bundled inside PyInstaller temp dir (_MEIPASS)
+    # 1. Bundled inside PyInstaller temp dir (_MEIPASS)
     if getattr(sys, "frozen", False):
-        meipass  = Path(getattr(sys, "_MEIPASS", ""))
-        bundled  = meipass / fname
+        meipass = Path(getattr(sys, "_MEIPASS", ""))
+        bundled = meipass / fname
         if bundled.exists():
-            # Copy out to app_dir so it persists after _MEIPASS cleanup
-            try:
-                import shutil as _sh
-                dest = app_dir() / fname
-                _sh.copy2(str(bundled), str(dest))
-                if sys.platform != "win32":
-                    dest.chmod(dest.stat().st_mode | 0o755)
-                return dest
-            except Exception:
-                return bundled   # fallback: use _MEIPASS path directly
+            return bundled
 
-    # 3. Next to the .py script (running from source)
+    # 2. Next to the .py script (running from source / dev mode)
     src_local = Path(__file__).resolve().parent / fname
     if src_local.exists():
         return src_local
@@ -3642,48 +3629,92 @@ class App(tk.Tk):
     def _build_ui(self):
         W = self._W
 
+        # ── Top bar ─────────────────────────────────────────────
         topbar = tk.Frame(self, bg=PANEL, height=60)
         topbar.pack(fill="x")
         topbar.pack_propagate(False)
 
         tk.Label(topbar, text="KevinNet DNS", bg=PANEL, fg=ACCENT,
                  font=F(18, "bold")).pack(side="left", padx=(20, 8))
-        tk.Label(topbar, text="·  DNS Resolver Scanner", bg=PANEL, fg=MUTED,
+        tk.Label(topbar, text="·  Multi-VPN DNS Scanner", bg=PANEL, fg=MUTED,
                  font=F(11)).pack(side="left")
         tk.Label(topbar, text="by Kevin Haji", bg=PANEL, fg=HINT,
-                 font=F(10)).pack(side="left", padx=(10,0))
+                 font=F(10)).pack(side="left", padx=(10, 0))
 
         btn_fr = tk.Frame(topbar, bg=PANEL)
         btn_fr.pack(side="right", padx=16)
 
         def top_btn(parent, wkey, text, fg_c, command):
-            """Label-based button — reliable on macOS and Windows alike."""
-            fr = tk.Frame(parent, bg=BORDER,
-                          highlightbackground=BORDER, highlightthickness=1)
+            fr  = tk.Frame(parent, bg=BORDER,
+                           highlightbackground=BORDER, highlightthickness=1)
             fr.pack(side="right", padx=(6, 0))
             lbl = tk.Label(fr, text=text, bg=BORDER, fg=fg_c,
-                           font=FA(10, "bold"), padx=14, pady=7,
-                           cursor="hand2")
+                           font=FA(10, "bold"), padx=14, pady=7, cursor="hand2")
             lbl.pack()
-            def on_enter(e):  lbl.config(bg=ACCENT, fg="#000000"); fr.config(bg=ACCENT)
-            def on_leave(e):  lbl.config(bg=BORDER, fg=fg_c);    fr.config(bg=BORDER)
-            def on_click(e):  command()
-            lbl.bind("<Enter>",   on_enter)
-            lbl.bind("<Leave>",   on_leave)
-            lbl.bind("<Button-1>",on_click)
+            def on_enter(e): lbl.config(bg=ACCENT, fg="#000000"); fr.config(bg=ACCENT)
+            def on_leave(e): lbl.config(bg=BORDER, fg=fg_c);     fr.config(bg=BORDER)
+            def on_click(e): command()
+            lbl.bind("<Enter>",    on_enter)
+            lbl.bind("<Leave>",    on_leave)
+            lbl.bind("<Button-1>", on_click)
             W[wkey] = lbl
 
-        top_btn(btn_fr, "btn_help", "؟  راهنما",
-                TEXT, lambda: show_help(self, self._lang))
-        top_btn(btn_fr, "btn_lang", "English",
-                ACCENT, self._toggle_lang)
+        top_btn(btn_fr, "btn_help", "؟  راهنما", TEXT,  lambda: show_help(self, self._lang))
+        top_btn(btn_fr, "btn_lang", "English",   ACCENT, self._toggle_lang)
 
         tk.Frame(self, bg=BORDER, height=1).pack(fill="x")
 
-        body = tk.Frame(self, bg=BG)
+        # ── Notebook (3 tabs) ────────────────────────────────────
+        nb_style = ttk.Style()
+        nb_style.theme_use("default")
+        nb_style.configure("App.TNotebook",
+                           background=BG, borderwidth=0,
+                           tabmargins=[0, 0, 0, 0])
+        nb_style.configure("App.TNotebook.Tab",
+                           background=PANEL, foreground=MUTED,
+                           font=F(11, "bold"),
+                           padding=[18, 10],
+                           borderwidth=0)
+        nb_style.map("App.TNotebook.Tab",
+                     background=[("selected", CARD), ("active", BORDER)],
+                     foreground=[("selected", TEXT),  ("active", TEXT)])
+
+        self._nb = ttk.Notebook(self, style="App.TNotebook")
+        self._nb.pack(fill="both", expand=True, padx=0, pady=0)
+
+        scan_tab    = tk.Frame(self._nb, bg=BG)
+        mdns_tab    = tk.Frame(self._nb, bg=BG)
+        vaydns_tab  = tk.Frame(self._nb, bg=BG)
+
+        self._nb.add(scan_tab,   text="🔍  Scan")
+        self._nb.add(mdns_tab,   text="🔗  MasterDNS")
+        self._nb.add(vaydns_tab, text="🌐  VayDNS")
+
+        self._build_scan_tab(scan_tab)
+        self._build_masterdns_tab(mdns_tab)
+        self._build_vaydns_tab(vaydns_tab)
+
+        # ── Footer ───────────────────────────────────────────────
+        tk.Frame(self, bg=BORDER, height=1).pack(fill="x")
+        footer = tk.Frame(self, bg=PANEL, height=36)
+        footer.pack(fill="x")
+        footer.pack_propagate(False)
+        tk.Label(
+            footer,
+            text="Designed & developed by  Kevin Haji  ·  kevinhaji.com"
+                 "  ·  kevin.fullstack.dev@gmail.com",
+            bg=PANEL, fg=MUTED, font=F(9)).pack(side="left", padx=16)
+        W["status_lbl"] = tk.Label(footer, text="● Ready",
+                                    bg=PANEL, fg=GREEN, font=F(9))
+        W["status_lbl"].pack(side="right", padx=16)
+
+    # ── SCAN TAB ─────────────────────────────────────────────────
+    def _build_scan_tab(self, parent):
+        """Original left+right layout inside the Scan tab."""
+        body = tk.Frame(parent, bg=BG)
         body.pack(fill="both", expand=True)
 
-        # Scrollable left panel — buttons always accessible even on small screens
+        # Scrollable left panel
         left_outer = tk.Frame(body, bg=BG, width=420)
         left_outer.pack(side="left", fill="y", padx=(12, 6), pady=10)
         left_outer.pack_propagate(False)
@@ -3703,53 +3734,33 @@ class App(tk.Tk):
             left_canvas.configure(scrollregion=left_canvas.bbox("all"))
         def _on_canvas_resize(e):
             left_canvas.itemconfig(left_win, width=e.width)
-        left.bind("<Configure>", _on_left_configure)
+        left.bind("<Configure>",   _on_left_configure)
         left_canvas.bind("<Configure>", _on_canvas_resize)
 
-        # Mouse wheel scroll
         def _on_mousewheel(e):
             if sys.platform == "darwin":
                 left_canvas.yview_scroll(-1 * int(e.delta), "units")
             elif sys.platform == "win32":
                 left_canvas.yview_scroll(-1 * int(e.delta / 120), "units")
             else:
-                if e.num == 4:
-                    left_canvas.yview_scroll(-1, "units")
-                else:
-                    left_canvas.yview_scroll(1, "units")
-
+                left_canvas.yview_scroll(-1 if e.num == 4 else 1, "units")
         left_canvas.bind("<MouseWheel>", _on_mousewheel)
         left_canvas.bind("<Button-4>",   _on_mousewheel)
         left_canvas.bind("<Button-5>",   _on_mousewheel)
         left.bind("<MouseWheel>",        _on_mousewheel)
 
-        self._build_left(left)
+        self._build_scan_left(left)
 
         right = tk.Frame(body, bg=BG)
         right.pack(side="left", fill="both", expand=True,
                    padx=(0, 16), pady=14)
         self._build_right(right)
 
-        # ── FOOTER — credit in ONE place only ──
-        tk.Frame(self, bg=BORDER, height=1).pack(fill="x")
-        footer = tk.Frame(self, bg=PANEL, height=36)
-        footer.pack(fill="x")
-        footer.pack_propagate(False)
-        tk.Label(
-            footer,
-            text="Designed & developed by  Kevin Haji  ·  kevinhaji.com"
-                 "  ·  kevin.fullstack.dev@gmail.com",
-            bg=PANEL, fg=MUTED, font=F(9)).pack(side="left", padx=16)
-        W["status_lbl"] = tk.Label(
-            footer, text="● Ready", bg=PANEL, fg=GREEN, font=F(9))
-        W["status_lbl"].pack(side="right", padx=16)
-
-    # ── LEFT PANEL ──────────────────────────────────────────────
-    def _build_left(self, parent):
+    def _build_scan_left(self, parent):
+        """Scan config panel (left side of Scan tab)."""
         W  = self._W
         fa = self._lang == "fa"
 
-        # helper: section card header
         def card_hdr(fr, key, en, pfa, col=ACCENT):
             lbl = tk.Label(fr, text=pfa if fa else en,
                            bg=BORDER, fg=col,
@@ -3758,7 +3769,6 @@ class App(tk.Tk):
             lbl.pack(fill="x")
             W[key] = lbl
 
-        # helper: labelled entry
         def entry_field(parent, wkey_lbl, wkey_ent, wkey_hint,
                         en_lbl, fa_lbl, en_hint, fa_hint,
                         var=None, show=None):
@@ -3788,46 +3798,32 @@ class App(tk.Tk):
             W[wkey_hint] = hint
             return var
 
-        # ── Card 1: Config ──
+        # Card: Tunnel Domain (shared across all VPN types)
         c1 = tk.Frame(parent, bg=CARD,
                       highlightbackground=BORDER, highlightthickness=1)
         c1.pack(fill="x", pady=(0, 10))
-        card_hdr(c1, "c1_hdr", "⚙  Tunnel Config", "⚙  تنظیمات تانل", ACCENT)
+        card_hdr(c1, "c1_hdr", "⚙  Tunnel Domain", "⚙  دامنه تانل", ACCENT)
 
-        self._domain_var  = entry_field(
-            c1, "domain_lbl",  "domain_ent",  "domain_hint",
-            "Tunnel Domain",   "دامنه تانل",
+        self._domain_var = entry_field(
+            c1, "domain_lbl", "domain_ent", "domain_hint",
+            "Tunnel Domain", "دامنه تانل",
             "subdomain pointing to your server  e.g. v.example.com",
             "ساب‌دامین که به سرور اشاره دارد  مثال: v.example.com")
+        tk.Frame(c1, bg=CARD, height=8).pack()
 
-        self._key_var = entry_field(
-            c1, "key_lbl", "key_ent", "key_hint",
-            "Encryption Key",  "کلید رمزنگاری",
-            "32-char key from server  (encrypt_key.txt)",
-            "کلید ۳۲ کاراکتری از سرور  (فایل encrypt_key.txt)")
-
-        self._country_var = entry_field(
-            c1, "country_lbl", "country_ent", "country_hint",
-            "Country / Folder", "نام کشور / پوشه",
-            "output folder name  e.g. Iran  Turkey  etc.",
-            "نام پوشه خروجی  مثال: Iran  Turkey")
-
-        tk.Frame(c1, bg=CARD, height=10).pack()
-
-        # ── Card 2: Scan Options ──
+        # Card: Scan Options
         c2 = tk.Frame(parent, bg=CARD,
                       highlightbackground=BORDER, highlightthickness=1)
         c2.pack(fill="x", pady=(0, 10))
         card_hdr(c2, "c2_hdr", "🔍  Scan Options", "🔍  تنظیمات اسکن", BLUE)
 
-        # Two rows of spinboxes so nothing gets cut off on narrow screens
         spin_row1 = tk.Frame(c2, bg=CARD)
         spin_row1.pack(fill="x", padx=14, pady=(10, 4))
         spin_row2 = tk.Frame(c2, bg=CARD)
         spin_row2.pack(fill="x", padx=14, pady=(0, 6))
 
-        def spin_col(parent, wlbl, wsp, en, pfa, lo, hi, default):
-            col = tk.Frame(parent, bg=CARD)
+        def spin_col(prnt, wlbl, wsp, en, pfa, lo, hi, default):
+            col = tk.Frame(prnt, bg=CARD)
             col.pack(side="left", fill="x", expand=True, padx=(0, 8))
             lbl = tk.Label(col, text=pfa if fa else en, bg=CARD, fg=MUTED,
                            font=FA(9) if fa else F(9), anchor="w")
@@ -3844,25 +3840,38 @@ class App(tk.Tk):
             W[wsp]  = sp
             return var
 
-        # Row 1: Target  Concurrency  Timeout
-        self._target_var  = spin_col(spin_row1, "t_lbl",  "t_sp",  "Target",       "هدف",             5,    500,  100)
-        self._conc_var    = spin_col(spin_row1, "c_lbl",  "c_sp",  "Concurrency",  "همزمانی",         10,   500,  100)
-        self._timeout_var = spin_col(spin_row1, "to_lbl", "to_sp", "Timeout (s)",  "Timeout (ثانیه)", 1,    10,     3)
-        # Row 2: Pool (full width so label is readable)
-        self._pool_var    = spin_col(spin_row2, "p_lbl",  "p_sp",  "Pool ×1000 IPs", "پول ×۱۰۰۰ IP",  10, 1000,  200)
-        # Add empty spacers to balance row 2 visually
+        self._target_var  = spin_col(spin_row1, "t_lbl",  "t_sp",
+                                      "Target",        "هدف",             5,    500, 100)
+        self._conc_var    = spin_col(spin_row1, "c_lbl",  "c_sp",
+                                      "Concurrency",   "همزمانی",         10,   200,  80)
+        self._timeout_var = spin_col(spin_row1, "to_lbl", "to_sp",
+                                      "Timeout (s)",   "Timeout (ثانیه)", 1,    10,    3)
+        self._pool_var    = spin_col(spin_row2, "p_lbl",  "p_sp",
+                                      "Pool ×1000 IPs","پول ×۱۰۰۰ IP",   10, 1000, 200)
         tk.Frame(spin_row2, bg=CARD).pack(side="left", fill="x", expand=True, padx=(0,8))
         tk.Frame(spin_row2, bg=CARD).pack(side="left", fill="x", expand=True)
 
-        tk.Frame(c2, bg=CARD, height=6).pack()
+        hint_fr = tk.Frame(c2, bg=CARD)
+        hint_fr.pack(fill="x", padx=14, pady=(0, 8))
+        h_fa = "پیشنهاد ایران: Target=100  Concurrency<=80  Timeout=3s  Pool=200-500\n" \
+               "Resolver kam? Pool raa bala bebrid ya eskan chand bar ejra konid"
+        h_en = "Iran recommended: Target=100  Concurrency<=80  Timeout=3s  Pool=200-500\n" \
+               "Finding few resolvers? Increase Pool or run scan multiple times"
+        W["scan_hint"] = tk.Label(hint_fr,
+                                   text=h_fa if fa else h_en,
+                                   bg=CARD, fg=HINT,
+                                   font=FA(8) if fa else F(8),
+                                   anchor="w", justify="left")
+        W["scan_hint"].pack(fill="x")
+        tk.Frame(c2, bg=CARD, height=4).pack()
 
-        # ── Buttons ──
+        # Scan buttons
         bf = tk.Frame(parent, bg=BG)
         bf.pack(fill="x", pady=(2, 0))
 
         def mk_btn(wkey, en, pfa, bg_c, fg_c, cmd, state="normal"):
-            act_bg = bg_c if state == "normal" else DIS_BG
-            act_fg = BTN_TEXT if state == "normal" else DIS_FG
+            act_bg  = bg_c if state == "normal" else DIS_BG
+            act_fg  = BTN_TEXT if state == "normal" else DIS_FG
             wrapper = tk.Frame(bf, bg=BG)
             wrapper.pack(fill="x", pady=(0, 5))
             b = tk.Button(wrapper,
@@ -3880,17 +3889,506 @@ class App(tk.Tk):
             b.pack(fill="x", padx=2)
             W[wkey] = b
 
-        mk_btn("btn_scan",    "▶  Start Scan",           "▶  شروع اسکن",           ACCENT,    SCAN_FG, self._start_scan)
-        mk_btn("btn_stop",    "■  Stop",                  "■  توقف",                DANGER,    "#000000", self._stop_scan,    "disabled")
-        mk_btn("btn_save",    "💾  Save Config Files",    "💾  ذخیره فایل‌ها",      BLUE,      SAVE_FG, self._save_configs, "disabled")
-        mk_btn("btn_connect", "🚀  Connect MasterDNSVPN", "🚀  اتصال MasterDNSVPN", PURPLE, BTN_TEXT, self._launch_vpn,   "disabled")
-        mk_btn("btn_clear",   "🗑  Clear",                 "🗑  پاک کردن",            BORDER,    CLEAR_FG,self._clear)
+        mk_btn("btn_scan",  "▶  Start Scan",      "▶  شروع اسکن",    ACCENT, BTN_TEXT, self._start_scan)
+        mk_btn("btn_stop",  "■  Stop",             "■  توقف",         DANGER, BTN_TEXT, self._stop_scan,  "disabled")
+        mk_btn("btn_clear", "🗑  Clear Results",   "🗑  پاک کردن",    BORDER, BTN_TEXT, self._clear)
 
-    # ── RIGHT PANEL ─────────────────────────────────────────────
+    # ── MASTERDNS TAB ────────────────────────────────────────────
+    def _build_masterdns_tab(self, parent):
+        W  = self._W
+        fa = self._lang == "fa"
+
+        body = tk.Frame(parent, bg=BG)
+        body.pack(fill="both", expand=True, padx=20, pady=16)
+
+        # Left config column
+        left = tk.Frame(body, bg=BG, width=440)
+        left.pack(side="left", fill="y")
+        left.pack_propagate(False)
+
+        def card_hdr(fr, key, en, pfa, col=ACCENT):
+            lbl = tk.Label(fr, text=pfa if fa else en,
+                           bg=BORDER, fg=col,
+                           font=FA(10, "bold") if fa else F(10, "bold"),
+                           padx=12, pady=6, anchor="w")
+            lbl.pack(fill="x")
+            W[key] = lbl
+
+        def entry_fld(prnt, wlbl, went, whint, en_l, fa_l, en_h, fa_h, show=None):
+            fr  = tk.Frame(prnt, bg=CARD)
+            fr.pack(fill="x", padx=14, pady=(10, 4))
+            lbl = tk.Label(fr, text=fa_l if fa else en_l,
+                           bg=CARD, fg=TEXT,
+                           font=FA(11) if fa else F(11), anchor="w")
+            lbl.pack(fill="x")
+            var = tk.StringVar()
+            kw  = dict(textvariable=var, bg=INPUT, fg=TEXT,
+                       insertbackground=ACCENT, relief="flat", bd=0,
+                       font=FM(12),
+                       highlightbackground=BORDER, highlightthickness=1,
+                       highlightcolor=ACCENT)
+            if show:
+                kw["show"] = show
+            ent = tk.Entry(fr, **kw)
+            ent.pack(fill="x", ipady=10, pady=(3, 0))
+            hint= tk.Label(fr, text=fa_h if fa else en_h,
+                           bg=CARD, fg=MUTED,
+                           font=FA(9) if fa else F(9), anchor="w")
+            hint.pack(fill="x")
+            W[wlbl] = lbl; W[went] = ent; W[whint] = hint
+            return var
+
+        # Card: MasterDNS Config
+        c_md = tk.Frame(left, bg=CARD,
+                        highlightbackground=BORDER, highlightthickness=1)
+        c_md.pack(fill="x", pady=(0, 12))
+        card_hdr(c_md, "md_hdr", "🔗  MasterDNS Config", "🔗  تنظیمات MasterDNS", ACCENT)
+
+        self._key_var = entry_fld(
+            c_md, "key_lbl", "key_ent", "key_hint",
+            "Encryption Key", "کلید رمزنگاری",
+            "32-char key from server  (encrypt_key.txt)",
+            "کلید ۳۲ کاراکتری از سرور  (فایل encrypt_key.txt)",
+            show="●")
+
+        self._country_var = entry_fld(
+            c_md, "country_lbl", "country_ent", "country_hint",
+            "Country / Folder", "نام کشور / پوشه",
+            "output folder name  e.g. Iran  Turkey",
+            "نام پوشه خروجی  مثال: Iran  Turkey")
+
+        tk.Frame(c_md, bg=CARD, height=8).pack()
+
+        # Info box
+        info_fr = tk.Frame(left, bg=CARD,
+                           highlightbackground=BORDER, highlightthickness=1)
+        info_fr.pack(fill="x", pady=(0, 12))
+        card_hdr(info_fr, "md_info_hdr", "ℹ  About MasterDNS", "ℹ  درباره MasterDNS", BLUE)
+        info_txt_en = (
+            "MasterDnsVPN by MasterkinG32 (Amin Mahmoudi)\n"
+            "github.com/masterking32/MasterDnsVPN\n\n"
+            "Uses encrypted DNS tunnel over UDP.\n"
+            "Config: client_config.toml + client_resolvers.txt\n"
+            "License: MIT"
+        )
+        info_txt_fa = (
+            "MasterDnsVPN توسط MasterkinG32 (Amin Mahmoudi)\n"
+            "github.com/masterking32/MasterDnsVPN\n\n"
+            "تانل DNS رمزگذاری‌شده از طریق UDP\n"
+            "فایل‌ها: client_config.toml + client_resolvers.txt\n"
+            "مجوز: MIT"
+        )
+        W["md_info_txt"] = tk.Label(info_fr,
+                                     text=info_txt_fa if fa else info_txt_en,
+                                     bg=CARD, fg=MUTED,
+                                     font=FA(9) if fa else F(9),
+                                     anchor="w", justify="left",
+                                     padx=14, pady=10)
+        W["md_info_txt"].pack(fill="x")
+
+        # Buttons
+        bf_md = tk.Frame(left, bg=BG)
+        bf_md.pack(fill="x", pady=(4, 0))
+
+        def mk_btn(wkey, en, pfa, bg_c, cmd, state="normal"):
+            act_bg  = bg_c if state == "normal" else DIS_BG
+            act_fg  = BTN_TEXT if state == "normal" else DIS_FG
+            wrapper = tk.Frame(bf_md, bg=BG)
+            wrapper.pack(fill="x", pady=(0, 5))
+            b = tk.Button(wrapper,
+                          text=pfa if fa else en,
+                          bg=act_bg, fg=act_fg,
+                          font=FA(12, "bold") if fa else F(12, "bold"),
+                          relief="flat", bd=0, padx=18, pady=11,
+                          cursor="hand2" if state == "normal" else "arrow",
+                          state=state,
+                          activebackground=bg_c, activeforeground=BTN_TEXT,
+                          disabledforeground=DIS_FG, command=cmd)
+            b.pack(fill="x", padx=2)
+            W[wkey] = b
+
+        mk_btn("btn_save",    "💾  Save MasterDNS Config",  "💾  ذخیره تنظیمات MasterDNS", BLUE,   self._save_configs)
+        mk_btn("btn_connect", "🚀  Connect MasterDNSVPN",   "🚀  اتصال MasterDNSVPN",      PURPLE, self._launch_vpn,   "disabled")
+
+        # Right: status / instructions
+        right = tk.Frame(body, bg=BG)
+        right.pack(side="left", fill="both", expand=True, padx=(20, 0))
+        self._build_vpn_instructions(right, "masterdns")
+
+    # ── VAYDNS TAB ───────────────────────────────────────────────
+    def _build_vaydns_tab(self, parent):
+        W  = self._W
+        fa = self._lang == "fa"
+
+        body = tk.Frame(parent, bg=BG)
+        body.pack(fill="both", expand=True, padx=20, pady=16)
+
+        # Left config column (scrollable)
+        left_outer = tk.Frame(body, bg=BG, width=460)
+        left_outer.pack(side="left", fill="y")
+        left_outer.pack_propagate(False)
+        vay_canvas = tk.Canvas(left_outer, bg=BG, bd=0, highlightthickness=0)
+        vay_scroll = ttk.Scrollbar(left_outer, orient="vertical",
+                                    command=vay_canvas.yview)
+        vay_scroll.pack(side="right", fill="y")
+        vay_canvas.pack(side="left", fill="both", expand=True)
+        left = tk.Frame(vay_canvas, bg=BG)
+        vw   = vay_canvas.create_window((0, 0), window=left, anchor="nw", width=440)
+        left.bind("<Configure>",
+                  lambda e: vay_canvas.configure(scrollregion=vay_canvas.bbox("all")))
+        vay_canvas.bind("<Configure>",
+                        lambda e: vay_canvas.itemconfig(vw, width=e.width))
+        def _mw(e):
+            if sys.platform == "darwin":
+                vay_canvas.yview_scroll(-1 * int(e.delta), "units")
+            elif sys.platform == "win32":
+                vay_canvas.yview_scroll(-1 * int(e.delta / 120), "units")
+            else:
+                vay_canvas.yview_scroll(-1 if e.num == 4 else 1, "units")
+        vay_canvas.bind("<MouseWheel>", _mw)
+        vay_canvas.bind("<Button-4>",   _mw)
+        vay_canvas.bind("<Button-5>",   _mw)
+        left.bind("<MouseWheel>",       _mw)
+
+        def card_hdr(fr, key, en, pfa, col=ACCENT):
+            lbl = tk.Label(fr, text=pfa if fa else en,
+                           bg=BORDER, fg=col,
+                           font=FA(10, "bold") if fa else F(10, "bold"),
+                           padx=12, pady=6, anchor="w")
+            lbl.pack(fill="x")
+            W[key] = lbl
+
+        def entry_fld(prnt, wlbl, went, whint, en_l, fa_l, en_h, fa_h):
+            fr  = tk.Frame(prnt, bg=CARD)
+            fr.pack(fill="x", padx=14, pady=(10, 4))
+            lbl = tk.Label(fr, text=fa_l if fa else en_l,
+                           bg=CARD, fg=TEXT,
+                           font=FA(11) if fa else F(11), anchor="w")
+            lbl.pack(fill="x")
+            var = tk.StringVar()
+            ent = tk.Entry(fr, textvariable=var, bg=INPUT, fg=TEXT,
+                           insertbackground=ACCENT, relief="flat", bd=0,
+                           font=FM(12),
+                           highlightbackground=BORDER, highlightthickness=1,
+                           highlightcolor=ACCENT)
+            ent.pack(fill="x", ipady=10, pady=(3, 0))
+            hint= tk.Label(fr, text=fa_h if fa else en_h,
+                           bg=CARD, fg=MUTED,
+                           font=FA(9) if fa else F(9), anchor="w")
+            hint.pack(fill="x")
+            W[wlbl] = lbl; W[went] = ent; W[whint] = hint
+            return var
+
+        # Card: VayDNS Required Config
+        c_vay = tk.Frame(left, bg=CARD,
+                         highlightbackground=BORDER, highlightthickness=1)
+        c_vay.pack(fill="x", pady=(0, 10))
+        card_hdr(c_vay, "vay_hdr", "🌐  VayDNS Config", "🌐  تنظیمات VayDNS", ACCENT)
+
+        self._vay_pubkey_var = entry_fld(
+            c_vay, "vay_pubkey_lbl", "vay_pubkey_ent", "vay_pubkey_hint",
+            "Server Public Key (hex)", "کلید عمومی سرور (hex)",
+            "64-char hex from server  e.g. a1b2c3d4...",
+            "کلید hex از سرور  مثال: a1b2c3d4...")
+
+        self._vay_country_var = entry_fld(
+            c_vay, "vay_country_lbl", "vay_country_ent", "vay_country_hint",
+            "Country / Folder", "نام کشور / پوشه",
+            "output folder name  e.g. Iran_VayDNS",
+            "نام پوشه خروجی  مثال: Iran_VayDNS")
+
+        self._vay_listen_var = entry_fld(
+            c_vay, "vay_listen_lbl", "vay_listen_ent", "vay_listen_hint",
+            "Listen Address", "آدرس شنود",
+            "local proxy listen address  e.g. 127.0.0.1:7000",
+            "آدرس شنود محلی  مثال: 127.0.0.1:7000")
+        self._vay_listen_var.set("127.0.0.1:7000")
+        tk.Frame(c_vay, bg=CARD, height=8).pack()
+
+        # Card: Transport
+        c_tr = tk.Frame(left, bg=CARD,
+                        highlightbackground=BORDER, highlightthickness=1)
+        c_tr.pack(fill="x", pady=(0, 10))
+        card_hdr(c_tr, "vay_tr_hdr", "📡  Transport Mode", "📡  نوع انتقال", BLUE)
+
+        tr_fr = tk.Frame(c_tr, bg=CARD)
+        tr_fr.pack(fill="x", padx=14, pady=(10, 6))
+        self._vay_transport_var = tk.StringVar(value="udp")
+
+        for tr_val, tr_en, tr_fa, tr_hint_en, tr_hint_fa in [
+            ("udp", "UDP (plaintext)",    "UDP (ساده)",
+             "Fast — use with scanned resolvers",
+             "سریع — با Resolver های اسکن‌شده استفاده کنید"),
+            ("doh", "DoH (DNS over HTTPS)", "DoH (DNS روی HTTPS)",
+             "Covert — resolver URL required e.g. https://dns.google/dns-query",
+             "مخفی — نیاز به URL مثال: https://dns.google/dns-query"),
+            ("dot", "DoT (DNS over TLS)", "DoT (DNS روی TLS)",
+             "Covert — resolver address required e.g. dns.google:853",
+             "مخفی — نیاز به آدرس مثال: dns.google:853"),
+        ]:
+            rb_fr = tk.Frame(tr_fr, bg=CARD)
+            rb_fr.pack(fill="x", pady=(0, 4))
+            rb = tk.Radiobutton(rb_fr,
+                                text=tr_fa if fa else tr_en,
+                                variable=self._vay_transport_var, value=tr_val,
+                                bg=CARD, fg=TEXT, selectcolor=INPUT,
+                                activebackground=CARD, activeforeground=TEXT,
+                                font=FA(10) if fa else F(10),
+                                command=self._vay_transport_changed)
+            rb.pack(side="left")
+            tr_h = tk.Label(rb_fr,
+                            text=tr_hint_fa if fa else tr_hint_en,
+                            bg=CARD, fg=HINT,
+                            font=FA(8) if fa else F(8))
+            tr_h.pack(side="left", padx=(8, 0))
+            W[f"vay_rb_{tr_val}"]    = rb
+            W[f"vay_rb_{tr_val}_h"]  = tr_h
+
+        # Custom resolver input (shown for DoH/DoT)
+        resolver_fr = tk.Frame(c_tr, bg=CARD)
+        resolver_fr.pack(fill="x", padx=14, pady=(0, 10))
+        W["vay_resolver_lbl"] = tk.Label(
+            resolver_fr,
+            text="DoH URL / DoT Address" if not fa else "آدرس DoH یا DoT",
+            bg=CARD, fg=TEXT,
+            font=FA(11) if fa else F(11), anchor="w")
+        W["vay_resolver_lbl"].pack(fill="x")
+        self._vay_resolver_var = tk.StringVar()
+        W["vay_resolver_ent"] = tk.Entry(
+            resolver_fr,
+            textvariable=self._vay_resolver_var,
+            bg=INPUT, fg=TEXT, insertbackground=ACCENT,
+            relief="flat", bd=0, font=FM(12),
+            highlightbackground=BORDER, highlightthickness=1,
+            highlightcolor=ACCENT)
+        W["vay_resolver_ent"].pack(fill="x", ipady=10, pady=(3, 0))
+        W["vay_resolver_hint"] = tk.Label(
+            resolver_fr,
+            text="e.g. https://dns.google/dns-query" if not fa else "مثال: https://dns.google/dns-query",
+            bg=CARD, fg=MUTED,
+            font=FA(9) if fa else F(9), anchor="w")
+        W["vay_resolver_hint"].pack(fill="x")
+        # Hidden by default (UDP mode)
+        resolver_fr.pack_forget()
+        W["vay_resolver_fr"] = resolver_fr
+
+        # Card: Advanced Options
+        c_adv = tk.Frame(left, bg=CARD,
+                         highlightbackground=BORDER, highlightthickness=1)
+        c_adv.pack(fill="x", pady=(0, 10))
+        card_hdr(c_adv, "vay_adv_hdr", "⚙  Advanced Options", "⚙  تنظیمات پیشرفته", WARN)
+
+        adv_fr = tk.Frame(c_adv, bg=CARD)
+        adv_fr.pack(fill="x", padx=14, pady=10)
+
+        def adv_spin(prnt, wlbl, wsp, en, pfa, lo, hi, default):
+            col = tk.Frame(prnt, bg=CARD)
+            col.pack(side="left", fill="x", expand=True, padx=(0, 8))
+            lbl = tk.Label(col, text=pfa if fa else en, bg=CARD, fg=MUTED,
+                           font=FA(9) if fa else F(9), anchor="w")
+            lbl.pack(fill="x")
+            var = tk.IntVar(value=default)
+            sp  = tk.Spinbox(col, from_=lo, to=hi, textvariable=var,
+                             bg=INPUT, fg=TEXT, insertbackground=ACCENT,
+                             buttonbackground=BORDER, relief="flat", bd=0,
+                             font=FM(11),
+                             highlightbackground=BORDER, highlightthickness=1,
+                             highlightcolor=ACCENT, width=5)
+            sp.pack(fill="x", ipady=8)
+            W[wlbl] = lbl; W[wsp] = sp
+            return var
+
+        self._vay_mtu_var = adv_spin(adv_fr, "vay_mtu_lbl", "vay_mtu_sp",
+                                      "MTU (bytes)", "MTU (بایت)",
+                                      50, 1452, 1232)
+        self._vay_rps_var = adv_spin(adv_fr, "vay_rps_lbl", "vay_rps_sp",
+                                      "RPS limit (0=off)", "حد RPS (0=بدون حد)",
+                                      0, 1000, 0)
+
+        # Record type dropdown
+        rt_fr = tk.Frame(c_adv, bg=CARD)
+        rt_fr.pack(fill="x", padx=14, pady=(0, 10))
+        W["vay_rt_lbl"] = tk.Label(rt_fr,
+                                    text="Record Type" if not fa else "نوع رکورد",
+                                    bg=CARD, fg=MUTED,
+                                    font=FA(9) if fa else F(9), anchor="w")
+        W["vay_rt_lbl"].pack(fill="x")
+        self._vay_record_var = tk.StringVar(value="txt")
+        rt_options = ["txt", "null", "cname", "a", "aaaa", "ns", "mx", "srv", "caa"]
+        W["vay_rt_menu"] = ttk.Combobox(rt_fr,
+                                         textvariable=self._vay_record_var,
+                                         values=rt_options,
+                                         state="readonly",
+                                         font=FM(11))
+        W["vay_rt_menu"].pack(fill="x", ipady=4, pady=(3, 0))
+        W["vay_rt_hint"] = tk.Label(rt_fr,
+                                     text="txt = compatible with all resolvers (default)",
+                                     bg=CARD, fg=HINT,
+                                     font=F(8), anchor="w")
+        W["vay_rt_hint"].pack(fill="x")
+
+        # Info box
+        info_fr = tk.Frame(left, bg=CARD,
+                           highlightbackground=BORDER, highlightthickness=1)
+        info_fr.pack(fill="x", pady=(0, 10))
+        card_hdr(info_fr, "vay_info_hdr", "ℹ  About VayDNS", "ℹ  درباره VayDNS", BLUE)
+        info_txt_en = (
+            "VayDNS by net2share\n"
+            "github.com/net2share/vaydns\n\n"
+            "Fork of dnstt. Supports UDP, DoH, DoT.\n"
+            "End-to-end encrypted (Noise protocol).\n"
+            "License: CC0 1.0 (Public Domain)"
+        )
+        info_txt_fa = (
+            "VayDNS توسط net2share\n"
+            "github.com/net2share/vaydns\n\n"
+            "مشتق از dnstt. پشتیبانی از UDP، DoH، DoT\n"
+            "رمزگذاری سرتاسری (پروتکل Noise)\n"
+            "مجوز: CC0 1.0 (دامنه عمومی)"
+        )
+        W["vay_info_txt"] = tk.Label(info_fr,
+                                      text=info_txt_fa if fa else info_txt_en,
+                                      bg=CARD, fg=MUTED,
+                                      font=FA(9) if fa else F(9),
+                                      anchor="w", justify="left",
+                                      padx=14, pady=10)
+        W["vay_info_txt"].pack(fill="x")
+
+        # Buttons
+        bf_vay = tk.Frame(left, bg=BG)
+        bf_vay.pack(fill="x", pady=(4, 0))
+
+        def mk_btn(wkey, en, pfa, bg_c, cmd, state="normal"):
+            act_bg  = bg_c if state == "normal" else DIS_BG
+            act_fg  = BTN_TEXT if state == "normal" else DIS_FG
+            wrapper = tk.Frame(bf_vay, bg=BG)
+            wrapper.pack(fill="x", pady=(0, 5))
+            b = tk.Button(wrapper,
+                          text=pfa if fa else en,
+                          bg=act_bg, fg=act_fg,
+                          font=FA(12, "bold") if fa else F(12, "bold"),
+                          relief="flat", bd=0, padx=18, pady=11,
+                          cursor="hand2" if state == "normal" else "arrow",
+                          state=state,
+                          activebackground=bg_c, activeforeground=BTN_TEXT,
+                          disabledforeground=DIS_FG, command=cmd)
+            b.pack(fill="x", padx=2)
+            W[wkey] = b
+
+        mk_btn("btn_vay_save",    "💾  Save VayDNS Config",  "💾  ذخیره تنظیمات VayDNS", BLUE,   self._save_vaydns)
+        mk_btn("btn_vay_connect", "🚀  Connect VayDNS",      "🚀  اتصال VayDNS",          PURPLE, self._launch_vaydns, "disabled")
+
+        # Right panel instructions
+        right = tk.Frame(body, bg=BG)
+        right.pack(side="left", fill="both", expand=True, padx=(20, 0))
+        self._build_vpn_instructions(right, "vaydns")
+
+    def _vay_transport_changed(self):
+        """Show/hide resolver URL input based on transport mode."""
+        W   = self._W
+        mode = self._vay_transport_var.get()
+        resolver_fr = W.get("vay_resolver_fr")
+        if resolver_fr:
+            if mode in ("doh", "dot"):
+                resolver_fr.pack(fill="x", padx=14, pady=(0, 10))
+                if mode == "doh":
+                    self._vay_resolver_var.set("https://dns.google/dns-query")
+                    W["vay_resolver_hint"].config(
+                        text="e.g. https://dns.google/dns-query  or  https://cloudflare-dns.com/dns-query")
+                else:
+                    self._vay_resolver_var.set("dns.google:853")
+                    W["vay_resolver_hint"].config(text="e.g. dns.google:853")
+            else:
+                resolver_fr.pack_forget()
+                self._vay_resolver_var.set("")
+
+    # ── VPN INSTRUCTIONS PANEL ────────────────────────────────────
+    def _build_vpn_instructions(self, parent, vpn_type):
+        """Right side of MasterDNS/VayDNS tabs — instructions."""
+        W  = self._W
+        fa = self._lang == "fa"
+
+        if vpn_type == "masterdns":
+            title_en = "How to get your Encryption Key"
+            title_fa = "نحوه دریافت کلید رمزنگاری"
+            steps_en = [
+                ("1. Install MasterDNS server on Linux",
+                 "bash <(curl -Ls https://raw.githubusercontent.com/masterking32/\nMasterDnsVPN/main/server_linux_install.sh)"),
+                ("2. Note the encryption key",
+                 "After install, key is shown in terminal\nand saved in encrypt_key.txt"),
+                ("3. Set up DNS records",
+                 "A record:  ns.example.com → your_server_ip\nNS record: v.example.com → ns.example.com"),
+                ("4. Enter key above and save",
+                 "The app will create a folder with config\nfiles + MasterDnsVPN binary ready to connect"),
+            ]
+            steps_fa = [
+                ("۱. نصب سرور MasterDNS روی لینوکس",
+                 "bash <(curl -Ls https://raw.githubusercontent.com/masterking32/\nMasterDnsVPN/main/server_linux_install.sh)"),
+                ("۲. یادداشت کردن کلید رمزنگاری",
+                 "بعد از نصب، کلید در ترمینال نشان داده می‌شود\nو در فایل encrypt_key.txt ذخیره می‌شود"),
+                ("۳. تنظیم رکوردهای DNS",
+                 "رکورد A:  ns.example.com → آدرس IP سرور\nرکورد NS: v.example.com → ns.example.com"),
+                ("۴. کلید را وارد کنید و ذخیره کنید",
+                 "برنامه یک پوشه با فایل‌های تنظیمات\n+ باینری MasterDnsVPN آماده اتصال می‌سازد"),
+            ]
+        else:
+            title_en = "How to get your VayDNS Public Key"
+            title_fa = "نحوه دریافت کلید عمومی VayDNS"
+            steps_en = [
+                ("1. Build or download VayDNS server",
+                 "github.com/net2share/vaydns\ngo build -o vaydns-server ./vaydns-server"),
+                ("2. Generate a keypair on the server",
+                 "./vaydns-server -gen-key -privkey-file server.key -pubkey-file server.pub\nCopy the public key hex shown in terminal"),
+                ("3. Run the server",
+                 "./vaydns-server -udp :5300 -privkey-file server.key\n  -domain t.example.com -upstream 127.0.0.1:8000"),
+                ("4. Set up DNS records (same as MasterDNS)",
+                 "A record:  tns.example.com → your_server_ip\nNS record: t.example.com → tns.example.com"),
+                ("5. Enter public key (hex) above and save",
+                 "The app creates a folder with:\n• client_resolvers.txt\n• connect.sh / connect.bat\n• vaydns-client binary"),
+                ("6. Run connect.sh to connect",
+                 "The script picks the best resolver and\nlaunches vaydns-client automatically"),
+            ]
+            steps_fa = [
+                ("۱. ساخت یا دانلود سرور VayDNS",
+                 "github.com/net2share/vaydns\ngo build -o vaydns-server ./vaydns-server"),
+                ("۲. ساخت keypair روی سرور",
+                 "./vaydns-server -gen-key -privkey-file server.key -pubkey-file server.pub\nکلید عمومی hex نمایش داده‌شده را کپی کنید"),
+                ("۳. اجرای سرور",
+                 "./vaydns-server -udp :5300 -privkey-file server.key\n  -domain t.example.com -upstream 127.0.0.1:8000"),
+                ("۴. تنظیم رکوردهای DNS",
+                 "رکورد A:  tns.example.com → IP سرور\nرکورد NS: t.example.com → tns.example.com"),
+                ("۵. کلید عمومی (hex) را وارد کنید و ذخیره کنید",
+                 "برنامه پوشه‌ای می‌سازد با:\n• client_resolvers.txt\n• connect.sh / connect.bat\n• باینری vaydns-client"),
+                ("۶. connect.sh را اجرا کنید",
+                 "اسکریپت بهترین Resolver را انتخاب کرده\nو vaydns-client را به صورت خودکار اجرا می‌کند"),
+            ]
+
+        # Title
+        tk.Label(parent,
+                 text=title_fa if fa else title_en,
+                 bg=BG, fg=ACCENT,
+                 font=FA(13, "bold") if fa else F(13, "bold"),
+                 anchor="w").pack(fill="x", pady=(0, 12))
+
+        steps = steps_fa if fa else steps_en
+        for step_title, step_body in steps:
+            sf = tk.Frame(parent, bg=CARD,
+                          highlightbackground=BORDER, highlightthickness=1)
+            sf.pack(fill="x", pady=(0, 8))
+            tk.Label(sf, text=step_title, bg=CARD, fg=TEXT,
+                     font=FA(10, "bold") if fa else F(10, "bold"),
+                     padx=12, pady=6, anchor="w").pack(fill="x")
+            tk.Label(sf, text=step_body, bg=CARD, fg=MUTED,
+                     font=FM(9), padx=14, pady=8,
+                     anchor="w", justify="left").pack(fill="x")
+
+        wkey_instr = f"{'vay' if vpn_type == 'vaydns' else 'md'}_instr_title"
+        W[wkey_instr] = parent
+
+    # ── RIGHT PANEL (scan results) ────────────────────────────────
     def _build_right(self, parent):
         W = self._W
 
-        # Progress row
         prog_top = tk.Frame(parent, bg=BG)
         prog_top.pack(fill="x", pady=(0, 6))
         W["prog_lbl"] = tk.Label(prog_top, text="Ready",
@@ -3900,8 +4398,7 @@ class App(tk.Tk):
                                bg=CARD, fg=GREEN,
                                font=F(10, "bold"), padx=12, pady=4,
                                relief="flat",
-                               highlightbackground=GREEN,
-                               highlightthickness=1)
+                               highlightbackground=GREEN, highlightthickness=1)
         W["badge"].pack(side="right")
 
         style = ttk.Style()
@@ -3915,7 +4412,6 @@ class App(tk.Tk):
                                          mode="determinate", maximum=100)
         W["progress"].pack(fill="x", pady=(0, 10))
 
-        # Results card
         res = tk.Frame(parent, bg=CARD,
                        highlightbackground=BORDER, highlightthickness=1)
         res.pack(fill="both", expand=True, pady=(0, 8))
@@ -3947,8 +4443,8 @@ class App(tk.Tk):
 
         tv_fr = tk.Frame(res, bg=CARD)
         tv_fr.pack(fill="both", expand=True)
-
-        W["tree"] = ttk.Treeview(tv_fr, columns=("ip", "score", "ms", "detail"),
+        W["tree"] = ttk.Treeview(tv_fr,
+                                  columns=("ip", "score", "ms", "detail"),
                                   show="headings", style="R.Treeview")
         W["tree"].heading("ip",     text="IP Address")
         W["tree"].heading("score",  text="Score")
@@ -3964,21 +4460,33 @@ class App(tk.Tk):
         vsb.pack(side="right", fill="y")
         W["tree"].pack(side="left", fill="both", expand=True)
 
-        # Log card
         log_card = tk.Frame(parent, bg=CARD,
                             highlightbackground=BORDER, highlightthickness=1)
         log_card.pack(fill="x")
-        tk.Label(log_card, text="📋  Log",
-                 bg=BORDER, fg=MUTED,
-                 font=F(10, "bold"), padx=12, pady=5, anchor="w").pack(fill="x")
+        log_hdr = tk.Frame(log_card, bg=BORDER)
+        log_hdr.pack(fill="x")
+        W["log_hdr_lbl"] = tk.Label(log_hdr, text="📋  Activity Log",
+                                     bg=BORDER, fg=MUTED,
+                                     font=F(10, "bold"), padx=12, pady=6,
+                                     anchor="w")
+        W["log_hdr_lbl"].pack(side="left", fill="x", expand=True)
         W["log"] = scrolledtext.ScrolledText(
-            log_card, height=7,
-            bg="#0a0f1e", fg="#7a9cc0",
+            log_card, height=8,
+            bg="#0c1120", fg="#a8bdd6",
             insertbackground=ACCENT,
-            font=FM(10), relief="flat", bd=0, state="disabled")
-        W["log"].pack(fill="both", padx=2, pady=2)
+            font=FM(10), relief="flat", bd=0, state="disabled",
+            selectbackground="#1e3a5c", selectforeground=TEXT,
+            wrap="word")
+        W["log"].pack(fill="both", padx=3, pady=(2, 3))
+        W["log"].tag_configure("star",    foreground="#2ecc71")
+        W["log"].tag_configure("diamond", foreground="#f5a623")
+        W["log"].tag_configure("arrow",   foreground="#e67e22")
+        W["log"].tag_configure("warn",    foreground="#e74c3c")
+        W["log"].tag_configure("info",    foreground="#5b8ff9")
+        W["log"].tag_configure("e2e",     foreground="#8e6bdb")
+        W["log"].tag_configure("muted",   foreground="#556080")
 
-    # ── LANGUAGE ────────────────────────────────────────────────
+    # ── LANGUAGE ─────────────────────────────────────────────────
     def _toggle_lang(self):
         self._lang = "en" if self._lang == "fa" else "fa"
         self._refresh_lang()
@@ -3988,40 +4496,48 @@ class App(tk.Tk):
         W  = self._W
         ff = FA if fa else F
 
-        W["btn_lang"].config(text="English" if fa else "فارسی",
-                             fg=ACCENT, font=FA(10, "bold"))
-        W["btn_help"].config(text="؟  راهنما" if fa else "?  Help",
-                             fg=TEXT,   font=FA(10, "bold"))
+        W["btn_lang"].config(text="English" if fa else "فارسی", fg=ACCENT, font=ff(10, "bold"))
+        W["btn_help"].config(text="؟  راهنما" if fa else "?  Help", fg=TEXT, font=ff(10, "bold"))
 
-        W["c1_hdr"].config(text="⚙  تنظیمات تانل"   if fa else "⚙  Tunnel Config",
-                           font=ff(10, "bold"))
-        W["c2_hdr"].config(text="🔍  تنظیمات اسکن"  if fa else "🔍  Scan Options",
-                           font=ff(10, "bold"))
+        # Tab labels
+        try:
+            self._nb.tab(0, text="🔍  اسکن"    if fa else "🔍  Scan")
+            self._nb.tab(1, text="🔗  MasterDNS")
+            self._nb.tab(2, text="🌐  VayDNS")
+        except Exception:
+            pass
+
+        # Scan tab widgets
+        for wkey, fa_t, en_t in [
+            ("c1_hdr",  "⚙  دامنه تانل",    "⚙  Tunnel Domain"),
+            ("c2_hdr",  "🔍  تنظیمات اسکن", "🔍  Scan Options"),
+        ]:
+            if wkey in W:
+                W[wkey].config(text=fa_t if fa else en_t, font=ff(10, "bold"))
 
         for wlbl, whin, fa_t, en_t, fa_h, en_h in [
             ("domain_lbl",  "domain_hint",
-             "دامنه تانل",     "Tunnel Domain",
-             "مثال:  v.example.com", "e.g.  v.example.com"),
-            ("key_lbl",     "key_hint",
-             "کلید رمزنگاری",  "Encryption Key",
-             "کلید ۳۲ کاراکتری", "32-char key"),
-            ("country_lbl", "country_hint",
-             "نام کشور / پوشه", "Country / Folder",
-             "مثال:  Iran",    "e.g.  Iran"),
+             "دامنه تانل", "Tunnel Domain",
+             "ساب‌دامین که به سرور اشاره دارد  مثال: v.example.com",
+             "subdomain pointing to your server  e.g. v.example.com"),
         ]:
-            W[wlbl].config(text=fa_t if fa else en_t, font=ff(11))
-            W[whin].config(text=fa_h if fa else en_h, font=ff(9))
+            if wlbl in W:
+                W[wlbl].config(text=fa_t if fa else en_t, font=ff(11))
+                W[whin].config(text=fa_h if fa else en_h, font=ff(9))
 
         for wlbl, fa_t, en_t in [
             ("t_lbl",  "هدف",            "Target"),
-            ("c_lbl",  "همزمانی",         "Concurrency"),
-            ("to_lbl", "Timeout (ثانیه)", "Timeout (s)"),
-            ("p_lbl",  "پول (×۱۰۰۰)",    "Pool (x1000)"),
+            ("c_lbl",  "همزمانی",        "Concurrency"),
+            ("to_lbl", "Timeout (ثانیه)","Timeout (s)"),
+            ("p_lbl",  "پول (×۱۰۰۰)",   "Pool (x1000)"),
         ]:
-            W[wlbl].config(text=fa_t if fa else en_t, font=ff(9))
+            if wlbl in W:
+                W[wlbl].config(text=fa_t if fa else en_t, font=ff(9))
 
-        h_fa = "پیشنهاد ایران: Target=100  Concurrency<=80  Timeout=3s  Pool=200-500\n"                "Resolver kam? Pool raa bala bebrid ya eskan chand bar ejra konid"
-        h_en = "Iran recommended: Target=100  Concurrency<=80  Timeout=3s  Pool=200-500\n"                "Finding few resolvers? Increase Pool or run scan multiple times"
+        h_fa = "پیشنهاد ایران: Target=100  Concurrency<=80  Timeout=3s  Pool=200-500\n" \
+               "Resolver kam? Pool raa bala bebrid ya eskan chand bar ejra konid"
+        h_en = "Iran recommended: Target=100  Concurrency<=80  Timeout=3s  Pool=200-500\n" \
+               "Finding few resolvers? Increase Pool or run scan multiple times"
         if "scan_hint" in W:
             W["scan_hint"].config(text=h_fa if fa else h_en, font=ff(8))
         if "log_hdr_lbl" in W:
@@ -4029,121 +4545,86 @@ class App(tk.Tk):
                                     font=ff(10, "bold"))
 
         for wkey, fa_t, en_t in [
-            ("btn_scan",    "▶  شروع اسکن",           "▶  Start Scan"),
-            ("btn_stop",    "■  توقف",                "■  Stop"),
-            ("btn_save",    "💾  ذخیره فایل‌ها",      "💾  Save Config Files"),
-            ("btn_connect", "🚀  اتصال MasterDNSVPN", "🚀  Connect MasterDNSVPN"),
-            ("btn_clear",   "🗑  پاک کردن",            "🗑  Clear"),
+            ("btn_scan",    "▶  شروع اسکن",    "▶  Start Scan"),
+            ("btn_stop",    "■  توقف",          "■  Stop"),
+            ("btn_clear",   "🗑  پاک کردن",     "🗑  Clear Results"),
+            ("btn_save",    "💾  ذخیره MasterDNS","💾  Save MasterDNS Config"),
+            ("btn_connect", "🚀  اتصال MasterDNSVPN","🚀  Connect MasterDNSVPN"),
+            ("btn_vay_save",    "💾  ذخیره VayDNS",  "💾  Save VayDNS Config"),
+            ("btn_vay_connect", "🚀  اتصال VayDNS",  "🚀  Connect VayDNS"),
         ]:
-            W[wkey].config(text=fa_t if fa else en_t,
-                           font=ff(12, "bold"))
+            if wkey in W:
+                W[wkey].config(text=fa_t if fa else en_t,
+                               font=ff(12, "bold"))
 
-        n = len(self._found_ips)
-        W["res_hdr"].config(
-            text="🟢  Resolver های تایید شده (۵/۶ یا ۶/۶)" if fa else "🟢  Verified Resolvers (5/6 or 6/6)")
-        W["badge"].config(text=f"{n}  {'یافت‌شده' if fa else 'found'}")
+        # MasterDNS tab
+        if "md_hdr" in W:
+            W["md_hdr"].config(text="🔗  تنظیمات MasterDNS" if fa else "🔗  MasterDNS Config",
+                               font=ff(10, "bold"))
+        for wlbl, whin, fa_t, en_t, fa_h, en_h in [
+            ("key_lbl",     "key_hint",
+             "کلید رمزنگاری", "Encryption Key",
+             "کلید ۳۲ کاراکتری از سرور  (فایل encrypt_key.txt)",
+             "32-char key from server  (encrypt_key.txt)"),
+            ("country_lbl", "country_hint",
+             "نام کشور / پوشه", "Country / Folder",
+             "نام پوشه خروجی  مثال: Iran  Turkey",
+             "output folder name  e.g. Iran  Turkey"),
+        ]:
+            if wlbl in W:
+                W[wlbl].config(text=fa_t if fa else en_t, font=ff(11))
+                W[whin].config(text=fa_h if fa else en_h, font=ff(9))
 
-    # ── LOG ─────────────────────────────────────────────────────
-    def _log(self, msg):
-        log = self._W.get("log")
-        if not log:
-            return
-        ts   = datetime.now().strftime("%H:%M:%S")
-        line = f"[{ts}]  {msg}\n"
-        if   msg.startswith("★"):                                    tag = "star"
-        elif msg.startswith("◆"):                                    tag = "diamond"
-        elif msg.startswith("▸"):                                    tag = "arrow"
-        elif any(x in msg for x in ("⚠","ERROR","error","خطا")):    tag = "warn"
-        elif any(x in msg for x in ("E2E","Phase 3","مرحله ۳","تأیید E2E")): tag = "e2e"
-        elif any(x in msg for x in ("Saved","ذخیره","copied","کپی","SUCCESS","SUCCESS")): tag = "star"
-        elif any(x in msg for x in ("Phase","مرحله","Pool","Settings","تنظیمات","پایگاه")): tag = "info"
-        else:                                                         tag = "muted"
-        log.config(state="normal")
-        log.insert("end", line, tag)
-        log.see("end")
-        log.config(state="disabled")
+        # VayDNS tab
+        if "vay_hdr" in W:
+            W["vay_hdr"].config(text="🌐  تنظیمات VayDNS" if fa else "🌐  VayDNS Config",
+                                font=ff(10, "bold"))
+        for wlbl, whin, fa_t, en_t, fa_h, en_h in [
+            ("vay_pubkey_lbl",  "vay_pubkey_hint",
+             "کلید عمومی سرور (hex)", "Server Public Key (hex)",
+             "کلید hex از سرور  مثال: a1b2c3d4...",
+             "64-char hex from server  e.g. a1b2c3d4..."),
+            ("vay_country_lbl", "vay_country_hint",
+             "نام کشور / پوشه", "Country / Folder",
+             "نام پوشه خروجی  مثال: Iran_VayDNS",
+             "output folder name  e.g. Iran_VayDNS"),
+            ("vay_listen_lbl",  "vay_listen_hint",
+             "آدرس شنود", "Listen Address",
+             "آدرس شنود محلی  مثال: 127.0.0.1:7000",
+             "local proxy listen address  e.g. 127.0.0.1:7000"),
+        ]:
+            if wlbl in W:
+                W[wlbl].config(text=fa_t if fa else en_t, font=ff(11))
+                W[whin].config(text=fa_h if fa else en_h, font=ff(9))
 
-    # ── SCAN ────────────────────────────────────────────────────
+        for wlbl, fa_t, en_t in [
+            ("vay_mtu_lbl", "MTU (بایت)", "MTU (bytes)"),
+            ("vay_rps_lbl", "حد RPS (0=بدون حد)", "RPS limit (0=off)"),
+        ]:
+            if wlbl in W:
+                W[wlbl].config(text=fa_t if fa else en_t, font=ff(9))
+
+    # ── SCAN ACTIONS ──────────────────────────────────────────────
     def _start_scan(self):
         if not DNS_AVAILABLE:
             messagebox.showerror(
                 "Error", "dnspython not installed.\nRun:  pip install dnspython")
             return
 
-        domain  = self._domain_var.get().strip()
-        key     = self._key_var.get().strip()
-        country = self._country_var.get().strip()
-        fa      = self._lang == "fa"
-
+        domain = self._domain_var.get().strip()
         if not domain:
+            fa = self._lang == "fa"
             messagebox.showwarning(
-                "", "دامنه را وارد کنید." if fa else "Please enter the domain.")
-            return
-        if not key:
-            messagebox.showwarning(
-                "", "کلید را وارد کنید." if fa else "Please enter the key.")
-            return
-        if not country:
-            messagebox.showwarning(
-                "", "نام پوشه را وارد کنید." if fa else "Please enter the folder name.")
+                "", "دامنه تانل را وارد کنید." if fa else "Enter the tunnel domain.")
             return
 
-        # Reset UI
-        self._found_ips.clear()
-        for row in self._W["tree"].get_children():
-            self._W["tree"].delete(row)
-        self._stop_ev.clear()
-        self._scanning = True
-        self._W["btn_scan"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
-        self._W["btn_stop"].config(state="normal",   bg=DANGER, fg="#000000", disabledforeground=DIS_FG)
-        self._W["btn_save"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
-        self._W["progress"]["value"] = 0
-        self._W["status_lbl"].config(text="● Scanning…", fg=WARN)
-
-        target  = self._target_var.get()
-        conc    = self._conc_var.get()
+        fa      = self._lang == "fa"
+        conc    = int(self._conc_var.get())
         timeout = float(self._timeout_var.get())
-        builtin_ips = get_builtin_resolvers()           # 376 known public
-        pool_size   = self._pool_var.get() * 1000
-        iran_ips    = get_iran_sample(pool_size)            # user-defined pool size
-        # Combine: built-in first (tested first), then Iran sample
-        seen = set()
-        ips  = []
-        for ip in builtin_ips + iran_ips:
-            if ip not in seen:
-                seen.add(ip)
-                ips.append(ip)
+        target  = int(self._target_var.get())
 
-        self._log(
-            f"{'پایگاه داده:' if fa else 'Pool:'} "
-            f"{len(builtin_ips)} {'resolver شناخته‌شده' if fa else 'known resolvers'} + "
-            f"{len(iran_ips)} {'IP ایران (مثل SlipNet)' if fa else 'Iran IPs (same scale as SlipNet)'} "
-            f"= {len(ips):,} {'کل' if fa else 'total'}")
-        self._log(
-            f"{'مرحله ۱: اسکن سریع  →  مرحله ۲: امتیازدهی (همه نشان داده می‌شن)  →  مرحله ۳: تأیید E2E واقعی' if fa else 'Phase 1: alive scan  →  Phase 2: scoring (all shown)  →  Phase 3: E2E real tunnel verify'}")
-        self._log(
-            f"{'★=6/6  ◆=4-5  ▸=2-3  ·=0-1  — همه در مرحله E2E تست می‌شن' if fa else '★=6/6  ◆=4-5  ▸=2-3  ·=0-1  — all go to E2E phase, real tunnel is the final filter'}")
-        self._log(
-            f"{'تنظیمات:' if fa else 'Settings:'} "
-            f"concurrency={conc}  timeout={timeout}s  target={target}")
-
-        # Callbacks (thread-safe via after())
-        def _prog(tested, total, found, pct, label=""):
-            self._q.put(("prog", tested, total, found, pct, label))
-
-        def _res(ip, score, max_score, ms, detail_str):
-            self._q.put(("res", ip, score, max_score, ms, detail_str))
-
-        def _done(tested, found):
-            self._q.put(("done", tested, found))
-
-        # ── Safe concurrency cap ──────────────────────────────
-        # macOS/Linux default fd limit is 256.
-        # Each DNS query opens a UDP socket → cap to avoid silent failures.
-        # Phase 1 (quick): safe_conc  Phase 2 (6-check): safe_conc // 4
-        # because each Phase-2 task opens up to 6 sockets simultaneously.
+        # Safe concurrency cap
         if sys.platform == "darwin":
-            # Try to raise the fd limit first
             try:
                 import resource
                 soft, hard = resource.getrlimit(resource.RLIMIT_NOFILE)
@@ -4153,18 +4634,55 @@ class App(tk.Tk):
             except Exception:
                 safe_conc  = min(conc, 80)
         elif sys.platform == "win32":
-            safe_conc = min(conc, 200)   # Windows handles more sockets
+            safe_conc = min(conc, 200)
         else:
-            safe_conc = min(conc, 150)   # Linux — generous but safe
-
-        safe_conc = max(safe_conc, 20)   # never go below 20
+            safe_conc = min(conc, 150)
+        safe_conc = max(safe_conc, 20)
 
         if safe_conc != conc:
             self._log(
                 f"{'محدودیت سیستمی: همزمانی از' if fa else 'OS socket limit: concurrency capped'} "
                 f"{conc} → {safe_conc}")
 
-        # Background thread with correct event loop
+        self._stop_ev.clear()
+        self._scanning  = True
+        self._found_ips = []
+        self._W["btn_scan"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, cursor="arrow")
+        self._W["btn_stop"].config(state="normal",   bg=DANGER, fg=BTN_TEXT, cursor="hand2")
+        self._W["btn_save"].config(state="disabled", bg=DIS_BG, fg=DIS_FG)
+        self._W["btn_connect"].config(state="disabled", bg=DIS_BG, fg=DIS_FG)
+        self._W["btn_vay_save"].config(state="disabled", bg=DIS_BG, fg=DIS_FG)
+        self._W["btn_vay_connect"].config(state="disabled", bg=DIS_BG, fg=DIS_FG)
+        self._W["progress"]["value"] = 0
+        self._W["status_lbl"].config(
+            text=f"● {'در حال اسکن…' if fa else 'Scanning…'}", fg=WARN)
+
+        # Build IP pool
+        pool_size  = self._pool_var.get() * 1000
+        builtin_ips = get_builtin_resolvers()
+        iran_ips    = get_iran_sample(pool_size)
+        seen = set(); ips = []
+        for ip in builtin_ips + iran_ips:
+            if ip not in seen:
+                seen.add(ip); ips.append(ip)
+
+        self._log(
+            f"{'پایگاه داده:' if fa else 'Pool:'} "
+            f"{len(builtin_ips)} {'resolver شناخته‌شده' if fa else 'known resolvers'} + "
+            f"{len(iran_ips)} {'IP ایران' if fa else 'Iran IPs'} "
+            f"= {len(ips):,} {'کل' if fa else 'total'}")
+        self._log(
+            f"{'مرحله ۱: اسکن سریع  →  مرحله ۲: امتیازدهی  →  مرحله ۳: تأیید E2E' if fa else 'Phase 1: alive scan  →  Phase 2: scoring  →  Phase 3: E2E verify'}")
+        self._log(
+            f"{'تنظیمات:' if fa else 'Settings:'} concurrency={safe_conc}  timeout={timeout}s  target={target}")
+
+        def _prog(tested, total, found, pct, label):
+            self._q.put(("prog", tested, total, found, pct, label))
+        def _res(ip, score, max_s, ms, detail):
+            self._q.put(("res", ip, score, max_s, ms, detail))
+        def _done(tested, found):
+            self._q.put(("done", tested, found))
+
         def _run():
             loop = (asyncio.SelectorEventLoop()
                     if sys.platform == "win32"
@@ -4179,19 +4697,18 @@ class App(tk.Tk):
 
         threading.Thread(target=_run, daemon=True).start()
 
-    def _on_progress(self, tested, total, found, pct, label=""):
+    def _stop_scan(self):
+        self._stop_ev.set()
+        self._scanning = False
         fa = self._lang == "fa"
-        self._W["progress"]["value"] = min(pct, 100)
-        if label:
-            txt = label
-        else:
-            txt = (f"تست‌شده: {tested:,}  |  یافت: {found}  |  پیشرفت: {pct:.1f}%"
-                   if fa else
-                   f"Tested: {tested:,}  |  Found: {found}  |  {pct:.1f}%")
-        self._W["prog_lbl"].config(text=txt)
-        n = len(self._found_ips)
-        self._W["badge"].config(
-            text=f"{n}  {'یافت‌شده' if fa else 'found'}")
+        self._W["btn_stop"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, cursor="arrow")
+        self._W["status_lbl"].config(
+            text=f"● {'متوقف شد' if fa else 'Stopped'}", fg=DANGER)
+
+    def _on_progress(self, tested, total, found, pct, label):
+        W = self._W
+        W["progress"]["value"] = pct
+        W["prog_lbl"].config(text=label)
 
     def _on_result(self, ip, score, max_score, ms, detail_str):
         fa = self._lang == "fa"
@@ -4200,187 +4717,190 @@ class App(tk.Tk):
         if "res_count" in self._W:
             self._W["res_count"].config(
                 text=f"{n} {'یافت‌شده' if fa else 'found'}")
-        # Color by score — all shown, sorted visually
         if score == 6:
-            tag, icon = "s6", "★"   # bright green  — perfect
+            tag, icon = "s6", "★"
         elif score >= 4:
-            tag, icon = "s4", "◆"   # yellow        — good
+            tag, icon = "s4", "◆"
         elif score >= 2:
-            tag, icon = "s2", "▸"   # orange        — weak but possible
+            tag, icon = "s2", "▸"
         else:
-            tag, icon = "s0", "·"   # muted         — very weak
+            tag, icon = "s0", "·"
         self._W["tree"].insert("", "end",
-                               values=(ip,
-                                       f"{score}/{max_score}",
-                                       f"{ms:.0f}",
-                                       detail_str),
+                               values=(ip, f"{score}/{max_score}",
+                                       f"{ms:.0f}", detail_str),
                                tags=(tag,))
         self._W["tree"].tag_configure("s6", foreground="#34d399")
         self._W["tree"].tag_configure("s4", foreground="#fbbf24")
         self._W["tree"].tag_configure("s2", foreground="#fb923c")
         self._W["tree"].tag_configure("s0", foreground="#64748b")
         self._log(f"{icon}  {ip}   {score}/{max_score}   {ms:.0f}ms   {detail_str}")
-        n = len(self._found_ips)
         self._W["badge"].config(
             text=f"{n}  {'یافت‌شده' if fa else 'found'}")
 
     def _on_done(self, tested, found):
         fa = self._lang == "fa"
         self._scanning = False
-        self._W["btn_scan"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
-        self._W["btn_stop"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
-        self._W["btn_save"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
-        self._log(f"{'اسکن DNS کامل شد — تست: ' if fa else 'DNS scan done — tested: '}{tested:,}  {'یافت: ' if fa else 'found: '}{found}")
+        self._W["btn_stop"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, cursor="arrow")
+        self._log(
+            f"{'اسکن DNS کامل شد — تست: ' if fa else 'DNS scan done — tested: '}"
+            f"{tested:,}  {'یافت: ' if fa else 'found: '}{found}")
 
         if found and not self._stop_ev.is_set():
-            # Auto-start Phase 3 E2E immediately
             self._W["status_lbl"].config(
-                text=f"● {'مرحله ۳: تأیید واقعی تانل…' if fa else 'Phase 3: E2E tunnel verify…'}",
-                fg="#a78bfa")
+                text=f"● {'مرحله ۳: تأیید E2E…' if fa else 'Phase 3: E2E verify…'}",
+                fg=PURPLE)
             self._log(
-                f"{'مرحله ۳ شروع شد — تأیید واقعی تانل با SlipNet…' if fa else 'Phase 3 started — real tunnel verify via SlipNet…'}")
+                f"{'مرحله ۳ شروع شد — تأیید واقعی تانل…' if fa else 'Phase 3 started — real tunnel verify…'}")
             self._run_e2e_auto()
         else:
-            # No results or stopped — just enable save if anything found
-            self._W["btn_scan"].config(state="normal",  bg=ACCENT,  fg="#000000", disabledforeground=DIS_FG)
+            self._W["btn_scan"].config(state="normal", bg=ACCENT, fg=BTN_TEXT, cursor="hand2")
             if found:
-                self._W["btn_save"].config(state="normal",  bg=BLUE,   fg="#000000", disabledforeground=DIS_FG)
+                self._W["btn_save"].config(state="normal",     bg=BLUE,   fg=BTN_TEXT, cursor="hand2")
+                self._W["btn_vay_save"].config(state="normal", bg=BLUE,   fg=BTN_TEXT, cursor="hand2")
             self._W["status_lbl"].config(
                 text=f"● {'اتمام' if fa else 'Done'}  —  {found} {'یافت‌شده' if fa else 'found'}",
                 fg=GREEN)
 
     def _run_e2e_auto(self):
-        """Auto Phase 3 — triggered automatically after Phase 2."""
         fa     = self._lang == "fa"
         domain = self._domain_var.get().strip()
-
         if not domain or not self._found_ips:
-            self._W["btn_scan"].config(state="normal",  bg=ACCENT,  fg="#000000", disabledforeground=DIS_FG)
+            self._W["btn_scan"].config(state="normal", bg=ACCENT, fg=BTN_TEXT, cursor="hand2")
             if self._found_ips:
-                self._W["btn_save"].config(state="normal",  bg=BLUE,   fg="#000000", disabledforeground=DIS_FG)
+                self._W["btn_save"].config(state="normal",     bg=BLUE, fg=BTN_TEXT, cursor="hand2")
+                self._W["btn_vay_save"].config(state="normal", bg=BLUE, fg=BTN_TEXT, cursor="hand2")
             return
 
-        timeout = float(self._timeout_var.get())
+        timeout     = float(self._timeout_var.get())
         ips_to_test = list(self._found_ips)
 
-        def _on_log(msg):
-            self._q.put(("log", msg))
-
+        def _on_log(msg):        self._q.put(("log",      msg))
         def _on_verified(ip, score, ms, detail):
-            self._q.put(("e2e_res", ip, score, ms, detail))
-
-        def _on_e2e_done(verified_ips):
-            self._q.put(("e2e_done", verified_ips))
+                                 self._q.put(("e2e_res",  ip, score, ms, detail))
+        def _on_e2e_done(v_ips): self._q.put(("e2e_done", v_ips))
 
         def _run():
-            run_e2e_verify(
-                ips_to_test, domain, timeout,
-                _on_log, _on_verified, _on_e2e_done, self._stop_ev)
+            run_e2e_verify(ips_to_test, domain, timeout,
+                           _on_log, _on_verified, _on_e2e_done, self._stop_ev)
 
         threading.Thread(target=_run, daemon=True).start()
 
-    def _stop_scan(self):
-        self._stop_ev.set()
-        self._W["btn_stop"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
-        self._W["btn_scan"].config(state="normal",   bg=ACCENT,  fg="#000000", disabledforeground=DIS_FG)
-        self._log("⏹  Stopped.")
+    def _poll_q(self):
+        try:
+            while True:
+                item = self._q.get_nowait()
+                kind = item[0]
+                if kind == "prog":
+                    _, tested, total, found, pct, label = item
+                    self._on_progress(tested, total, found, pct, label)
+                elif kind == "res":
+                    _, ip, score, max_s, ms, detail = item
+                    self._on_result(ip, score, max_s, ms, detail)
+                elif kind == "done":
+                    _, tested, found = item
+                    self._on_done(tested, found)
+                elif kind == "log":
+                    _, msg = item
+                    self._log(msg)
+                elif kind == "e2e_res":
+                    _, ip, score, ms, detail = item
+                    W = self._W
+                    for row in W["tree"].get_children():
+                        vals = W["tree"].item(row, "values")
+                        if vals and vals[0] == ip:
+                            W["tree"].item(row, values=(ip, f"{score}/6", str(ms), detail))
+                            W["tree"].item(row, tags=("e2e",))
+                            W["tree"].tag_configure("e2e", foreground="#a78bfa")
+                            break
+                    else:
+                        W["tree"].insert("", "end",
+                                         values=(ip, f"{score}/6", str(ms), detail),
+                                         tags=("e2e",))
+                        W["tree"].tag_configure("e2e", foreground="#a78bfa")
+                elif kind == "e2e_done":
+                    _, verified = item
+                    fa = self._lang == "fa"
+                    self._found_ips = list(verified)
+                    self._W["btn_scan"].config(state="normal",      bg=ACCENT, fg=BTN_TEXT, cursor="hand2")
+                    if verified:
+                        self._W["btn_save"].config(state="normal",      bg=BLUE,  fg=BTN_TEXT, cursor="hand2")
+                        self._W["btn_vay_save"].config(state="normal",  bg=BLUE,  fg=BTN_TEXT, cursor="hand2")
+                    n = len(verified)
+                    self._W["badge"].config(
+                        text=f"{n}  {'تأیید E2E' if fa else 'E2E verified'}")
+                    self._W["status_lbl"].config(
+                        text=f"● {'کامل' if fa else 'Done'}  —  {n} {'تأیید شده' if fa else 'E2E verified'}",
+                        fg=GREEN)
+                    self._log(
+                        f"{'✓ مرحله ۳ کامل:' if fa else '✓ Phase 3 done:'} "
+                        f"{n} {'resolver تأیید E2E شده' if fa else 'E2E-verified resolvers'}")
+        except Exception:
+            pass
+        self.after(40, self._poll_q)
+
+    def _log(self, msg):
+        log = self._W.get("log")
+        if not log:
+            return
+        ts   = datetime.now().strftime("%H:%M:%S")
+        line = f"[{ts}]  {msg}\n"
+        if   msg.startswith("★"):                                        tag = "star"
+        elif msg.startswith("◆"):                                        tag = "diamond"
+        elif msg.startswith("▸"):                                        tag = "arrow"
+        elif any(x in msg for x in ("⚠","ERROR","error","خطا")):        tag = "warn"
+        elif any(x in msg for x in ("E2E","Phase 3","مرحله ۳","تأیید E2E")): tag = "e2e"
+        elif any(x in msg for x in ("Saved","ذخیره","copied","کپی")):   tag = "star"
+        elif any(x in msg for x in ("Phase","مرحله","Pool","Settings","تنظیمات","پایگاه")): tag = "info"
+        else:                                                             tag = "muted"
+        log.config(state="normal")
+        log.insert("end", line, tag)
+        log.see("end")
+        log.config(state="disabled")
 
     def _clear(self):
-        self._stop_ev.set()
-        self._found_ips.clear()
-        for row in self._W["tree"].get_children():
-            self._W["tree"].delete(row)
-        log = self._W["log"]
-        log.config(state="normal")
-        log.delete("1.0", "end")
-        log.config(state="disabled")
-        self._W["progress"]["value"] = 0
-        self._W["prog_lbl"].config(text="Ready")
         fa = self._lang == "fa"
-        self._W["badge"].config(text=f"0  {'یافت‌شده' if fa else 'found'}")
-        self._W["status_lbl"].config(text="● Ready", fg=GREEN)
-        self._W["btn_save"].config(state="disabled",    bg="#1a2a4a")
-        self._W["btn_connect"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
-        self._W["btn_scan"].config(state="normal",       bg=ACCENT)
-        self._W["btn_stop"].config(state="disabled",     bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
+        W  = self._W
+        for row in W["tree"].get_children():
+            W["tree"].delete(row)
+        W["log"].config(state="normal")
+        W["log"].delete("1.0", "end")
+        W["log"].config(state="disabled")
+        W["progress"]["value"] = 0
+        W["prog_lbl"].config(text="Ready" if not fa else "آماده")
+        W["badge"].config(text="0  found" if not fa else "۰  یافت‌شده")
+        W["res_count"].config(text="")
+        W["btn_save"].config(state="disabled",      bg=DIS_BG, fg=DIS_FG, cursor="arrow")
+        W["btn_connect"].config(state="disabled",   bg=DIS_BG, fg=DIS_FG, cursor="arrow")
+        W["btn_vay_save"].config(state="disabled",  bg=DIS_BG, fg=DIS_FG, cursor="arrow")
+        W["btn_vay_connect"].config(state="disabled",bg=DIS_BG, fg=DIS_FG, cursor="arrow")
+        W["btn_scan"].config(state="normal",  bg=ACCENT, fg=BTN_TEXT, cursor="hand2")
+        W["btn_stop"].config(state="disabled",bg=DIS_BG, fg=DIS_FG,  cursor="arrow")
+        self._found_ips    = []
         self._saved_folder = None
+        self._vay_saved_folder = None
+        W["status_lbl"].config(text="● Ready", fg=GREEN)
 
-    # ── SAVE ────────────────────────────────────────────────────
-    def _launch_vpn(self):
-        """Launch MasterDnsVPN from the saved country folder in a terminal."""
-        fa     = self._lang == "fa"
-        folder = self._saved_folder
-
-        if not folder or not folder.exists():
-            messagebox.showwarning("",
-                "ابتدا فایل‌ها را ذخیره کنید." if fa
-                else "Save the config files first.")
-            return
-
-        bin_name = "MasterDnsVPN.exe" if sys.platform == "win32" else "MasterDnsVPN"
-        bin_path = folder / bin_name
-
-        if not bin_path.exists():
-            no_bin = "فایل اجرایی پیدا نشد:" if fa else "Binary not found:"
-            hint   = "مطمئن شوید MasterDnsVPN در کنار برنامه قرار دارد." if fa else "Make sure MasterDnsVPN is placed next to this app."
-            messagebox.showerror("", f"{no_bin}\n{bin_path}\n\n{hint}")
-            return
-
-        try:
-            import subprocess
-            if sys.platform == "win32":
-                subprocess.Popen(
-                    ["cmd", "/c", "start", "", str(bin_path)],
-                    cwd=str(folder)
-                )
-            elif sys.platform == "darwin":
-                script = (
-                    'tell application "Terminal"\n'
-                    '    activate\n'
-                    f'    do script "cd {folder} && ./{bin_name}"\n'
-                    'end tell'
-                )
-                subprocess.Popen(["osascript", "-e", script])
-            else:
-                launched = False
-                for term, args in [
-                    ("gnome-terminal", ["--working-directory", str(folder), "--", str(bin_path)]),
-                    ("xterm",          ["-e", f"cd {folder} && ./{bin_name}"]),
-                    ("konsole",        ["--workdir", str(folder), "-e", str(bin_path)]),
-                    ("xfce4-terminal", ["--working-directory", str(folder), "-e", str(bin_path)]),
-                    ("x-terminal-emulator", ["-e", str(bin_path)]),
-                ]:
-                    try:
-                        subprocess.Popen([term] + args)
-                        launched = True
-                        break
-                    except FileNotFoundError:
-                        continue
-                if not launched:
-                    subprocess.Popen([str(bin_path)], cwd=str(folder))
-
-            self._log(
-                f"{'MasterDNSVPN راه‌اندازی شد از:' if fa else 'MasterDNSVPN launched from:'} {folder}")
-            self._W["status_lbl"].config(
-                text=f"● {'در حال اتصال…' if fa else 'Connecting…'}", fg=GREEN)
-
-        except Exception as e:
-            err = "خطا در راه‌اندازی:" if fa else "Launch error:"
-            messagebox.showerror("Error", f"{err}\n{e}")
-            self._log(f"Launch error: {e}")
-
+    # ── MASTERDNS SAVE / CONNECT ──────────────────────────────────
     def _save_configs(self):
         if not self._found_ips:
             messagebox.showwarning(
                 "", "هیچ Resolver یافت نشد." if self._lang == "fa"
-                    else "No resolvers found.")
+                    else "No resolvers found. Run a scan first.")
             return
 
         domain  = self._domain_var.get().strip()
         key     = self._key_var.get().strip()
         country = self._country_var.get().strip()
-        ts      = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        folder  = app_dir() / country
+        fa      = self._lang == "fa"
+
+        if not domain or not key or not country:
+            messagebox.showwarning(
+                "", "دامنه، کلید و نام کشور را وارد کنید." if fa
+                    else "Enter domain, key, and country name.")
+            return
+
+        ts     = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        folder = app_dir() / country
         folder.mkdir(parents=True, exist_ok=True)
 
         cfg = (CONFIG_TEMPLATE
@@ -4395,25 +4915,11 @@ class App(tk.Tk):
         (folder / "client_resolvers.txt").write_text(
             hdr + "\n".join(self._found_ips) + "\n", encoding="utf-8")
 
-        fa  = self._lang == "fa"
-
-        # ── Copy MasterDnsVPN executable ────────────────────────
+        # Copy MasterDnsVPN binary
         import shutil
         exe_src    = get_masterdns_exe()
         exe_copied = False
         exe_note   = ""
-
-        # Debug: log every location checked
-        fa_log = self._lang == "fa"
-        fname  = "MasterDnsVPN.exe" if sys.platform == "win32" else "MasterDnsVPN"
-        self._log(f"{'جستجوی MasterDnsVPN:' if fa_log else 'Looking for MasterDnsVPN:'}")
-        self._log(f"  app_dir = {app_dir()}")
-        self._log(f"  local   = {app_dir() / fname}  exists={( app_dir() / fname).exists()}")
-        if getattr(sys, 'frozen', False):
-            meipass = Path(getattr(sys, '_MEIPASS', 'N/A'))
-            self._log(f"  MEIPASS = {meipass / fname}  exists={(meipass / fname).exists()}")
-        self._log(f"  result  = {exe_src}")
-
         if exe_src:
             try:
                 exe_dst = folder / exe_src.name
@@ -4421,30 +4927,21 @@ class App(tk.Tk):
                 if sys.platform != "win32":
                     exe_dst.chmod(exe_dst.stat().st_mode | 0o111)
                 exe_copied = True
-                self._log(
-                    f"{'فایل اجرایی کپی شد:' if fa else 'Executable copied:'} {exe_src.name}")
+                self._log(f"{'فایل اجرایی کپی شد:' if fa else 'Binary copied:'} {exe_src.name}")
                 exe_note = f"\n• {exe_src.name}"
             except Exception as e:
-                self._log(
-                    f"{'خطا در کپی:' if fa else 'Copy error:'} {e}")
+                self._log(f"{'خطا در کپی:' if fa else 'Copy error:'} {e}")
                 exe_note = f"\n  (could not copy: {e})"
         else:
             self._log(
-                f"{'فایل MasterDnsVPN یافت نشد — در کنار برنامه قرار دهید' if fa else 'MasterDnsVPN not found — place it next to this app'}")
-            exe_note = (
-                "\n  (MasterDnsVPN.exe not found — place it next to this app)"
-                if sys.platform == "win32" else
-                "\n  (MasterDnsVPN not found — place it next to this app)"
-            )
+                f"{'MasterDnsVPN یافت نشد — کنار برنامه قرار دهید' if fa else 'MasterDnsVPN not found — place next to this app'}")
+            exe_note = "\n  (MasterDnsVPN not found — place next to this app)"
 
         self._saved_folder = folder
-        self._W["btn_connect"].config(state="normal",  bg=CONN_BG, fg="#000000", disabledforeground=DIS_FG)
+        self._W["btn_connect"].config(state="normal",  bg=PURPLE, fg=BTN_TEXT, cursor="hand2")
         self._W["status_lbl"].config(
-            text=f"● {'ذخیره شد' if fa else 'Saved'}", fg=ACCENT)
-        self._log(f"Saved  →  {folder}")
-        if exe_copied:
-            self._log(
-                f"{'دکمه اتصال آماده است' if fa else 'Connect button ready — click to launch MasterDNSVPN'}")
+            text=f"● {'ذخیره شد' if fa else 'Saved'} — MasterDNS", fg=ACCENT)
+        self._log(f"Saved MasterDNS  →  {folder}")
         messagebox.showinfo(
             "Saved",
             f"{'فایل‌ها ذخیره شدند:' if fa else 'Files saved to:'}"
@@ -4452,6 +4949,344 @@ class App(tk.Tk):
             f"\n• client_config.toml"
             f"\n• client_resolvers.txt"
             f"{exe_note}")
+
+    def _launch_vpn(self):
+        fa     = self._lang == "fa"
+        folder = self._saved_folder
+        if not folder or not folder.exists():
+            messagebox.showwarning(
+                "", "ابتدا فایل‌ها را ذخیره کنید." if fa else "Save config files first.")
+            return
+        bin_name = "MasterDnsVPN.exe" if sys.platform == "win32" else "MasterDnsVPN"
+        bin_path = folder / bin_name
+        if not bin_path.exists():
+            no_bin = "فایل اجرایی پیدا نشد:" if fa else "Binary not found:"
+            hint   = "مطمئن شوید MasterDnsVPN در کنار برنامه قرار دارد." if fa else "Place MasterDnsVPN next to this app."
+            messagebox.showerror("", f"{no_bin}\n{bin_path}\n\n{hint}")
+            return
+        try:
+            import subprocess
+            if sys.platform == "win32":
+                subprocess.Popen(["cmd", "/c", "start", "", str(bin_path)], cwd=str(folder))
+            elif sys.platform == "darwin":
+                script = (
+                    'tell application "Terminal"\n'
+                    '    activate\n'
+                    f'    do script "cd {folder} && ./{bin_name}"\n'
+                    'end tell'
+                )
+                subprocess.Popen(["osascript", "-e", script])
+            else:
+                launched = False
+                for term, args in [
+                    ("gnome-terminal", ["--working-directory", str(folder), "--", str(bin_path)]),
+                    ("xterm",          ["-e", f"cd {folder} && ./{bin_name}"]),
+                    ("konsole",        ["--workdir", str(folder), "-e", str(bin_path)]),
+                ]:
+                    try:
+                        subprocess.Popen([term] + args); launched = True; break
+                    except FileNotFoundError:
+                        continue
+                if not launched:
+                    subprocess.Popen([str(bin_path)], cwd=str(folder))
+            self._log(f"{'MasterDNSVPN راه‌اندازی شد' if fa else 'MasterDNSVPN launched'} — {folder}")
+            self._W["status_lbl"].config(
+                text=f"● {'در حال اتصال…' if fa else 'Connecting…'}", fg=GREEN)
+        except Exception as e:
+            messagebox.showerror("Error", f"{'خطا:' if fa else 'Error:'}\n{e}")
+
+    # ── VAYDNS SAVE / CONNECT ─────────────────────────────────────
+    def _get_vaydns_exe(self):
+        """Find the bundled vaydns-client binary for this platform/arch."""
+        if sys.platform == "win32":
+            names = ["vaydns-client-windows-amd64.exe",
+                     "vaydns-client.exe", "vaydns-client-windows-x64.exe"]
+        elif sys.platform == "darwin":
+            import platform
+            arch = platform.machine().lower()
+            if "arm" in arch or "m1" in arch or "m2" in arch or "m3" in arch:
+                names = ["vaydns-client-darwin-arm64",
+                         "vaydns-client-darwin-amd64", "vaydns-client"]
+            else:
+                names = ["vaydns-client-darwin-amd64",
+                         "vaydns-client-darwin-arm64", "vaydns-client"]
+        else:
+            import platform
+            arch = platform.machine().lower()
+            if "arm" in arch or "aarch" in arch:
+                names = ["vaydns-client-linux-arm64",
+                         "vaydns-client-linux-armv7", "vaydns-client"]
+            else:
+                names = ["vaydns-client-linux-amd64", "vaydns-client"]
+
+        # Search in _MEIPASS (frozen) then next to script
+        search_dirs = []
+        if getattr(sys, "frozen", False):
+            search_dirs.append(Path(getattr(sys, "_MEIPASS", "")))
+        search_dirs.append(Path(__file__).resolve().parent)
+
+        for d in search_dirs:
+            for name in names:
+                p = d / name
+                if p.exists():
+                    return p
+        return None
+
+    def _save_vaydns(self):
+        if not self._found_ips:
+            messagebox.showwarning(
+                "", "هیچ Resolver یافت نشد." if self._lang == "fa"
+                    else "No resolvers found. Run a scan first.")
+            return
+
+        fa      = self._lang == "fa"
+        domain  = self._domain_var.get().strip()
+        pubkey  = self._vay_pubkey_var.get().strip()
+        country = self._vay_country_var.get().strip()
+        listen  = self._vay_listen_var.get().strip() or "127.0.0.1:7000"
+        mode    = self._vay_transport_var.get()
+        resolver= self._vay_resolver_var.get().strip()
+        mtu     = int(self._vay_mtu_var.get())
+        rps     = int(self._vay_rps_var.get())
+        rectype = self._vay_record_var.get()
+
+        if not domain or not pubkey or not country:
+            messagebox.showwarning(
+                "", "دامنه، کلید عمومی و نام کشور را وارد کنید." if fa
+                    else "Enter domain, public key, and country name.")
+            return
+
+        ts     = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        folder = app_dir() / country
+        folder.mkdir(parents=True, exist_ok=True)
+
+        # Write resolvers file
+        hdr = (f"# VayDNS Resolvers — Generated by KevinNet DNS\n"
+               f"# Created: {ts}\n"
+               f"# Country: {country}\n"
+               f"# Domain: {domain}\n\n")
+        (folder / "client_resolvers.txt").write_text(
+            hdr + "\n".join(self._found_ips) + "\n", encoding="utf-8")
+
+        # Build vaydns-client flags
+        if mode == "udp":
+            transport_flag = "-udp RESOLVER:53"
+        elif mode == "doh":
+            transport_flag = f"-doh {resolver}" if resolver else "-doh https://dns.google/dns-query"
+        else:
+            transport_flag = f"-dot {resolver}" if resolver else "-dot dns.google:853"
+
+        extra_flags = []
+        if mtu != 1232:
+            extra_flags.append(f"-mtu {mtu}")
+        if rps > 0:
+            extra_flags.append(f"-rps {rps}")
+        if rectype != "txt":
+            extra_flags.append(f"-record-type {rectype}")
+        extra = " \\\n  ".join(extra_flags)
+        if extra:
+            extra = " \\\n  " + extra
+
+        # Write connect.sh (macOS/Linux)
+        if mode == "udp":
+            sh_content = (
+                "#!/usr/bin/env bash\n"
+                "# VayDNS Connect Script — Generated by KevinNet DNS\n"
+                f"# Domain: {domain}\n"
+                f"# Created: {ts}\n\n"
+                'cd "$(dirname "$0")"\n\n'
+                "# Pick first resolver from list\n"
+                "RESOLVER=$(grep -v '^#' client_resolvers.txt | grep -v '^$' | head -1 | tr -d '[:space:]')\n"
+                'if [ -z "$RESOLVER" ]; then\n'
+                '  echo "ERROR: No resolvers in client_resolvers.txt"\n'
+                "  exit 1\n"
+                "fi\n\n"
+                'echo "Connecting via resolver: $RESOLVER"\n'
+                'echo "Listen address: ' + listen + '"\n\n'
+                f"./vaydns-client -udp \"$RESOLVER:53\" \\\\\n"
+                f"  -pubkey \"{pubkey}\" \\\\\n"
+                f"  -domain \"{domain}\" \\\\\n"
+                f"  -listen \"{listen}\""
+                f"{extra}\n"
+            )
+        else:
+            resolver_used = resolver if resolver else (
+                "https://dns.google/dns-query" if mode == "doh" else "dns.google:853")
+            sh_content = (
+                "#!/usr/bin/env bash\n"
+                "# VayDNS Connect Script — Generated by KevinNet DNS\n"
+                f"# Domain: {domain}\n"
+                f"# Transport: {mode.upper()}\n"
+                f"# Created: {ts}\n\n"
+                'cd "$(dirname "$0")"\n\n'
+                f'echo "Connecting via {mode.upper()}: {resolver_used}"\n'
+                f'echo "Listen address: {listen}"\n\n'
+                f"./vaydns-client -{mode} \"{resolver_used}\" \\\\\n"
+                f"  -pubkey \"{pubkey}\" \\\\\n"
+                f"  -domain \"{domain}\" \\\\\n"
+                f"  -listen \"{listen}\""
+                f"{extra}\n"
+            )
+
+        sh_path = folder / "connect_vaydns.sh"
+        sh_path.write_text(sh_content, encoding="utf-8")
+        sh_path.chmod(sh_path.stat().st_mode | 0o755)
+
+        # Write connect.bat (Windows)
+        if mode == "udp":
+            bat_content = (
+                "@echo off\n"
+                "REM VayDNS Connect Script — Generated by KevinNet DNS\n"
+                f"REM Domain: {domain}\n"
+                f"REM Created: {ts}\n\n"
+                "cd /d \"%~dp0\"\n\n"
+                'FOR /F "tokens=1 delims=" %%A IN (\'findstr /V "^#" client_resolvers.txt\') DO (\n'
+                "  SET RESOLVER=%%A\n"
+                "  GOTO :found\n"
+                ")\n"
+                ":found\n"
+                "IF \"%RESOLVER%\"==\"\" (\n"
+                "  echo ERROR: No resolvers found\n"
+                "  pause & exit /b 1\n"
+                ")\n"
+                "echo Connecting via: %RESOLVER%:53\n\n"
+                f"vaydns-client-windows-amd64.exe -udp %RESOLVER%:53 ^\n"
+                f"  -pubkey \"{pubkey}\" ^\n"
+                f"  -domain \"{domain}\" ^\n"
+                f"  -listen \"{listen}\"\n"
+                "pause\n"
+            )
+        else:
+            resolver_used = resolver if resolver else (
+                "https://dns.google/dns-query" if mode == "doh" else "dns.google:853")
+            bat_content = (
+                "@echo off\n"
+                "REM VayDNS Connect Script — Generated by KevinNet DNS\n\n"
+                "cd /d \"%~dp0\"\n\n"
+                f"echo Connecting via {mode.upper()}: {resolver_used}\n\n"
+                f"vaydns-client-windows-amd64.exe -{mode} \"{resolver_used}\" ^\n"
+                f"  -pubkey \"{pubkey}\" ^\n"
+                f"  -domain \"{domain}\" ^\n"
+                f"  -listen \"{listen}\"\n"
+                "pause\n"
+            )
+
+        bat_path = folder / "connect_vaydns.bat"
+        bat_path.write_text(bat_content, encoding="utf-8")
+
+        # Write README for the folder
+        readme = (
+            f"# VayDNS Config — {country}\n\n"
+            f"Generated by KevinNet DNS · Kevin Haji · kevinhaji.com\n"
+            f"Created: {ts}\n\n"
+            f"## Files\n\n"
+            f"- `client_resolvers.txt` — list of verified DNS resolvers\n"
+            f"- `connect_vaydns.sh` — connect script (macOS/Linux)\n"
+            f"- `connect_vaydns.bat` — connect script (Windows)\n"
+            f"- `vaydns-client-*` — VayDNS client binary\n\n"
+            f"## Usage\n\n"
+            f"```bash\n"
+            f"chmod +x vaydns-client* connect_vaydns.sh\n"
+            f"./connect_vaydns.sh\n"
+            f"```\n\n"
+            f"The script connects to the best resolver and listens on `{listen}`.\n"
+            f"Configure your app to use SOCKS5 proxy at `{listen}`.\n\n"
+            f"## Config\n\n"
+            f"- Domain: `{domain}`\n"
+            f"- Transport: `{mode.upper()}`\n"
+            f"- Listen: `{listen}`\n"
+            f"- MTU: `{mtu}`\n"
+            f"- Record type: `{rectype}`\n"
+        )
+        (folder / "README_vaydns.md").write_text(readme, encoding="utf-8")
+
+        # Copy vaydns-client binary
+        import shutil
+        vay_exe = self._get_vaydns_exe()
+        vay_copied = False
+        vay_note   = ""
+        if vay_exe:
+            try:
+                dst = folder / "vaydns-client"
+                if sys.platform == "win32":
+                    dst = folder / vay_exe.name
+                shutil.copy2(str(vay_exe), str(dst))
+                if sys.platform != "win32":
+                    dst.chmod(dst.stat().st_mode | 0o111)
+                vay_copied = True
+                self._log(f"{'VayDNS binary کپی شد' if fa else 'VayDNS binary copied'}: {dst.name}")
+                vay_note = f"\n• {dst.name}"
+            except Exception as e:
+                self._log(f"{'خطا در کپی VayDNS:' if fa else 'VayDNS copy error:'} {e}")
+                vay_note = f"\n  (binary copy failed: {e})"
+        else:
+            self._log(
+                f"{'vaydns-client یافت نشد — از github.com/net2share/vaydns دانلود کنید' if fa else 'vaydns-client not found — download from github.com/net2share/vaydns'}")
+            vay_note = "\n  (vaydns-client not found — download from github.com/net2share/vaydns)"
+
+        self._vay_saved_folder = folder
+        self._W["btn_vay_connect"].config(state="normal", bg=PURPLE, fg=BTN_TEXT, cursor="hand2")
+        self._W["status_lbl"].config(
+            text=f"● {'ذخیره شد' if fa else 'Saved'} — VayDNS", fg=ACCENT)
+        self._log(f"Saved VayDNS  →  {folder}")
+
+        messagebox.showinfo(
+            "VayDNS Saved",
+            f"{'فایل‌ها ذخیره شدند:' if fa else 'Files saved to:'}"
+            f"\n{folder}\n"
+            f"\n• client_resolvers.txt"
+            f"\n• connect_vaydns.sh"
+            f"\n• connect_vaydns.bat"
+            f"\n• README_vaydns.md"
+            f"{vay_note}")
+
+    def _launch_vaydns(self):
+        fa     = self._lang == "fa"
+        folder = self._vay_saved_folder
+        if not folder or not folder.exists():
+            messagebox.showwarning(
+                "", "ابتدا تنظیمات VayDNS را ذخیره کنید." if fa
+                    else "Save VayDNS config first.")
+            return
+
+        if sys.platform == "win32":
+            script = folder / "connect_vaydns.bat"
+            if script.exists():
+                import subprocess
+                subprocess.Popen(
+                    ["cmd", "/c", "start", "", str(script)], cwd=str(folder))
+        else:
+            script = folder / "connect_vaydns.sh"
+            if not script.exists():
+                messagebox.showerror(
+                    "", f"connect_vaydns.sh not found in {folder}")
+                return
+            import subprocess
+            if sys.platform == "darwin":
+                apple_script = (
+                    'tell application "Terminal"\n'
+                    '    activate\n'
+                    f'    do script "cd {folder} && ./connect_vaydns.sh"\n'
+                    'end tell'
+                )
+                subprocess.Popen(["osascript", "-e", apple_script])
+            else:
+                launched = False
+                for term, args in [
+                    ("gnome-terminal", ["--working-directory", str(folder), "--", str(script)]),
+                    ("xterm",          ["-e", f"cd {folder} && ./connect_vaydns.sh"]),
+                    ("konsole",        ["--workdir", str(folder), "-e", str(script)]),
+                ]:
+                    try:
+                        subprocess.Popen([term] + args); launched = True; break
+                    except FileNotFoundError:
+                        continue
+                if not launched:
+                    subprocess.Popen([str(script)], cwd=str(folder))
+
+        self._log(f"{'VayDNS راه‌اندازی شد' if fa else 'VayDNS launched'} — {folder}")
+        self._W["status_lbl"].config(
+            text=f"● {'در حال اتصال VayDNS…' if fa else 'Connecting VayDNS…'}", fg=PURPLE)
 
 
 # ═══════════════════════════════════════════════════════════════

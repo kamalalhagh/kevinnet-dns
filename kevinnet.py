@@ -72,14 +72,20 @@ def get_masterdns_exe() -> Path | None:
         return local
 
     # 2. Bundled inside PyInstaller temp dir (_MEIPASS)
-    # Return the _MEIPASS path directly — _save_configs copies it to the
-    # country folder. We don't copy to app_dir() to avoid leaving the
-    # binary sitting next to the app after every save.
     if getattr(sys, "frozen", False):
-        meipass = Path(getattr(sys, "_MEIPASS", ""))
-        bundled = meipass / fname
+        meipass  = Path(getattr(sys, "_MEIPASS", ""))
+        bundled  = meipass / fname
         if bundled.exists():
-            return bundled
+            # Copy out to app_dir so it persists after _MEIPASS cleanup
+            try:
+                import shutil as _sh
+                dest = app_dir() / fname
+                _sh.copy2(str(bundled), str(dest))
+                if sys.platform != "win32":
+                    dest.chmod(dest.stat().st_mode | 0o755)
+                return dest
+            except Exception:
+                return bundled   # fallback: use _MEIPASS path directly
 
     # 3. Next to the .py script (running from source)
     src_local = Path(__file__).resolve().parent / fname
@@ -3437,23 +3443,21 @@ HELP = {
         ("۷  روی 🚀 اتصال MasterDNSVPN کلیک کنید",
          "ترمینال باز می‌شود و VPN با فایل‌های ذخیره‌شده راه‌اندازی می‌شود.\n"
          "فقط بعد از ذخیره موفق فعال می‌شود."),
-        ("📋  تب پروفایل‌ها — ویرایش تنظیمات MTU و بیشتر",
-         "هر اسکن ذخیره‌شده یک پروفایل می‌سازد.\n"
-         "در تب پروفایل‌ها می‌توانید:\n"
-         "• پروفایل‌های قبلی را بدون اسکن مجدد باز کنید\n"
-         "• MTU، روش رمزنگاری، بالانس و غیره را تغییر دهید\n"
-         "• تغییرات را ذخیره کنید تا client_config.toml بازنویسی شود\n"
+        ("📋  تب پروفایل‌ها — ویرایش بدون اسکن مجدد",
+         "هر اسکن ذخیره‌شده یک پروفایل می‌سازد. در تب پروفایل‌ها:\n"
+         "• پروفایل‌های قبلی را باز کنید و تنظیمات را تغییر دهید\n"
+         "• ذخیره کنید تا client_config.toml فوری بازنویسی شود\n"
          "• مستقیم از پروفایل VPN را راه‌اندازی کنید\n"
-         "• پروفایل‌های قدیمی را با خیال راحت حذف کنید"),
-        ("🔧  مقادیر بهینه برای ایران (تنظیمات پروفایل)",
-         "روش رمزنگاری: 1 — XOR  (کمترین سربار در DNS)\n"
-         "استراتژی بالانس: 3 — Least Loss  (افت پکت بالای ایران)\n"
-         "تکرار بسته: 2 یا 3  (افزونگی در شبکه پر افت)\n"
-         "حداکثر MTU آپلود: 80-100  (کوچک‌تر = کمتر DPI trigger)\n"
-         "حداکثر MTU دانلود: 700  (از fragmentation ISP جلوگیری)\n"
-         "حداقل MTU آپلود: 38  (نگه داشتن بیشترین تعداد Resolver)\n"
-         "حداقل MTU دانلود: 400  (Resolverهای مرزی را در pool نگه دار)\n"
-         "سطح لاگ: INFO  (عملکرد عادی؛ DEBUG فقط برای عیب‌یابی)"),
+         "• پروفایل‌های قدیمی را حذف کنید (با یا بدون پوشه خروجی)"),
+        ("🔧  مقادیر بهینه برای ایران (در پروفایل‌ها)",
+         "روش رمزنگاری:   1 — XOR          کمترین سربار در DNS\n"
+         "استراتژی بالانس: 3 — Least Loss   افت پکت بالای ایران\n"
+         "تکرار بسته:      2 یا 3           افزونگی در شبکه پر افت\n"
+         "Max Upload MTU:  80–100           query کوچک‌تر = کمتر DPI\n"
+         "Max Download MTU: 700            جلوگیری از fragmentation\n"
+         "Min Upload MTU:  38              بیشترین تعداد Resolver\n"
+         "Min Download MTU: 400           Resolverهای مرزی را نگه دار\n"
+         "Log Level:       INFO            عملکرد عادی"),
         ("مک — مشکل 'damaged' یا 'cannot be verified'",
          "در ترمینال این دو دستور را بزنید:\n"
          "chmod +x KevinNet_macOS_Universal\n"
@@ -3490,23 +3494,21 @@ HELP = {
         ("7  Click 🚀 Connect MasterDNSVPN",
          "Opens a terminal and launches the VPN with your saved config.\n"
          "Only becomes active after a successful save."),
-        ("📋  Profiles Tab — Edit MTU and other options",
-         "Every saved scan creates a profile.\n"
-         "In the Profiles tab you can:\n"
-         "• Re-open any previous scan without scanning again\n"
-         "• Change MTU, encryption method, balancing, and more\n"
+        ("📋  Profiles Tab — edit options without re-scanning",
+         "Every saved scan creates a profile. In the Profiles tab you can:\n"
+         "• Re-open any previous scan and change its settings\n"
          "• Save changes — instantly rewrites client_config.toml\n"
          "• Launch VPN directly from any profile\n"
-         "• Delete old profiles cleanly"),
+         "• Delete old profiles (with or without the output folder)"),
         ("🔧  Iran-optimised values (Profile options)",
-         "Encryption Method: 1 — XOR  (lowest overhead inside DNS)\n"
-         "Balancing Strategy: 3 — Least Loss  (Iran has high packet loss)\n"
-         "Packet Duplication: 2 or 3  (redundancy on lossy paths)\n"
-         "Max Upload MTU: 80–100  (smaller = less likely to trigger DPI)\n"
-         "Max Download MTU: 700  (avoids ISP fragmentation)\n"
-         "Min Upload MTU: 38  (keeps maximum resolver pool)\n"
-         "Min Download MTU: 400  (keeps marginal resolvers in pool)\n"
-         "Log Level: INFO  (normal use; DEBUG only for troubleshooting)"),
+         "Encryption Method:   1 — XOR          lowest overhead in DNS\n"
+         "Balancing Strategy:  3 — Least Loss    high packet loss in Iran\n"
+         "Packet Duplication:  2 or 3            redundancy on lossy paths\n"
+         "Max Upload MTU:      80–100            smaller = less DPI trigger\n"
+         "Max Download MTU:    700               avoids ISP fragmentation\n"
+         "Min Upload MTU:      38                keeps max resolver pool\n"
+         "Min Download MTU:    400               keeps marginal resolvers\n"
+         "Log Level:           INFO              normal use"),
         ("macOS — 'damaged' or 'cannot be verified' error",
          "Run these two commands in Terminal:\n"
          "chmod +x KevinNet_macOS_Universal\n"
@@ -3519,23 +3521,65 @@ def show_help(parent, lang):
     d = tk.Toplevel(parent)
     d.title(title)
     d.configure(bg=PANEL)
-    d.resizable(False, False)
+    d.resizable(True, True)
     d.grab_set()
     ff = FA if lang == "fa" else F
+
+    # ── Fixed header ─────────────────────────────────────────────
     tk.Label(d, text=title, bg=PANEL, fg=ACCENT,
              font=ff(14, "bold"), pady=16, padx=24).pack(fill="x")
     tk.Frame(d, bg=BORDER, height=1).pack(fill="x", padx=24)
-    body = tk.Frame(d, bg=PANEL)
-    body.pack(fill="both", padx=24, pady=10)
+
+    # ── Scrollable body ──────────────────────────────────────────
+    scroll_frame = tk.Frame(d, bg=PANEL)
+    scroll_frame.pack(fill="both", expand=True, padx=0, pady=0)
+
+    canvas = tk.Canvas(scroll_frame, bg=PANEL, bd=0, highlightthickness=0)
+    scrollbar = ttk.Scrollbar(scroll_frame, orient="vertical",
+                               command=canvas.yview)
+    scrollbar.pack(side="right", fill="y")
+    canvas.pack(side="left", fill="both", expand=True)
+    canvas.configure(yscrollcommand=scrollbar.set)
+
+    body = tk.Frame(canvas, bg=PANEL)
+    body_win = canvas.create_window((0, 0), window=body, anchor="nw")
+
+    def _on_body_configure(e):
+        canvas.configure(scrollregion=canvas.bbox("all"))
+    def _on_canvas_resize(e):
+        canvas.itemconfig(body_win, width=e.width)
+    body.bind("<Configure>", _on_body_configure)
+    canvas.bind("<Configure>", _on_canvas_resize)
+
+    # Mouse wheel scroll — works on all platforms
+    def _on_mousewheel(e):
+        if sys.platform == "darwin":
+            canvas.yview_scroll(-1 * int(e.delta), "units")
+        elif sys.platform == "win32":
+            canvas.yview_scroll(-1 * int(e.delta / 120), "units")
+        else:
+            canvas.yview_scroll(-1 if e.num == 4 else 1, "units")
+    canvas.bind("<MouseWheel>", _on_mousewheel)
+    canvas.bind("<Button-4>",   _on_mousewheel)
+    canvas.bind("<Button-5>",   _on_mousewheel)
+    body.bind("<MouseWheel>",   _on_mousewheel)
+
+    inner = tk.Frame(body, bg=PANEL)
+    inner.pack(fill="x", padx=24, pady=10)
+
     for step_title, step_body in steps:
-        row = tk.Frame(body, bg=CARD,
+        row = tk.Frame(inner, bg=CARD,
                        highlightbackground=BORDER, highlightthickness=1)
         row.pack(fill="x", pady=4, ipady=6, ipadx=8)
         tk.Label(row, text=step_title, bg=CARD, fg=ACCENT,
-                 font=ff(11, "bold"), anchor="w", padx=12).pack(fill="x")
-        tk.Label(row, text=step_body.replace("\\n", "\n"),
+                 font=ff(11, "bold"), anchor="w", padx=12,
+                 wraplength=520, justify="left").pack(fill="x")
+        tk.Label(row, text=step_body,
                  bg=CARD, fg=TEXT, font=ff(10),
-                 anchor="w", padx=20, justify="left").pack(fill="x")
+                 anchor="w", padx=20, justify="left",
+                 wraplength=510).pack(fill="x")
+
+    # ── Fixed footer ─────────────────────────────────────────────
     tk.Frame(d, bg=BORDER, height=1).pack(fill="x", padx=24)
     tk.Button(d,
               text="متوجه شدم  ✓" if lang == "fa" else "Got it  ✓",
@@ -3543,11 +3587,17 @@ def show_help(parent, lang):
               relief="flat", bd=0, pady=11, padx=30, cursor="hand2",
               activebackground="#00bfa5", activeforeground="#000000",
               command=d.destroy).pack(pady=14)
+
+    # ── Size and centre — cap at 90% of screen height ────────────
     d.update_idletasks()
+    screen_h = d.winfo_screenheight()
+    screen_w = d.winfo_screenwidth()
+    dlg_w    = min(620, screen_w - 80)
+    dlg_h    = min(d.winfo_reqheight(), int(screen_h * 0.88))
     px = parent.winfo_x() + parent.winfo_width()  // 2
     py = parent.winfo_y() + parent.winfo_height() // 2
-    w, h = d.winfo_reqwidth(), d.winfo_reqheight()
-    d.geometry(f"{w}x{h}+{px - w//2}+{py - h//2}")
+    d.geometry(f"{dlg_w}x{dlg_h}+{px - dlg_w//2}+{py - dlg_h//2}")
+    d.minsize(480, 400)
 
 # ═══════════════════════════════════════════════════════════════
 #  MAIN APPLICATION

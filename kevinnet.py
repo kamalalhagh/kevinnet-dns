@@ -2269,7 +2269,7 @@ DOMAINS = ["{domain}"]
 # 4 = AES-192-GCM
 # 5 = AES-256-GCM
 # Must match server DATA_ENCRYPTION_METHOD.
-DATA_ENCRYPTION_METHOD = 1
+DATA_ENCRYPTION_METHOD = {encryption_method}
 
 # Shared encryption key.
 # Required on the client.
@@ -2296,7 +2296,7 @@ PROTOCOL_TYPE = "SOCKS5"
 # If you want other devices on your network to use this proxy, use "0.0.0.0"
 # and enable SOCKS5_AUTH.
 LISTEN_IP = "127.0.0.1"
-LISTEN_PORT = 18000
+LISTEN_PORT = {listen_port}
 
 # Local SOCKS5 authentication.
 # This protects the local proxy itself, not the remote server.
@@ -2355,16 +2355,16 @@ LOCAL_DNS_CACHE_FLUSH_INTERVAL_SECONDS = 60.0
 # 3 = Least Loss
 # 4 = Lowest Latency
 # Modes 3 and 4 use runtime feedback from sends/successes.
-RESOLVER_BALANCING_STRATEGY = 2
+RESOLVER_BALANCING_STRATEGY = {balancing_strategy}
 
 # Duplicate each normal outgoing tunnel packet this many times.
 # Clamped in code to [1, 8].
 # Higher values improve resilience but increase bandwidth and CPU usage.
-PACKET_DUPLICATION_COUNT = 2
+PACKET_DUPLICATION_COUNT = {packet_duplication}
 
 # Duplicate stream setup packets (STREAM_SYN / SOCKS5_SYN) this many times.
 # Clamped in code to [PACKET_DUPLICATION_COUNT, 8].
-SETUP_PACKET_DUPLICATION_COUNT = 2
+SETUP_PACKET_DUPLICATION_COUNT = {packet_duplication}
 
 # Stream-aware resolver failover.
 # If a stream keeps resending on the same preferred resolver, it can move.
@@ -2438,13 +2438,13 @@ COMPRESSION_MIN_SIZE = 120
 
 # Minimum accepted upload/download MTUs after testing.
 # 0 can be used to effectively disable a bound, but keep realistic values.
-MIN_UPLOAD_MTU = 38
-MIN_DOWNLOAD_MTU = 500
+MIN_UPLOAD_MTU = {min_upload_mtu}
+MIN_DOWNLOAD_MTU = {min_download_mtu}
 
 # Initial maximum MTU search bounds.
 # Must be >= the matching MIN value if both are set.
-MAX_UPLOAD_MTU = 150
-MAX_DOWNLOAD_MTU = 900
+MAX_UPLOAD_MTU = {max_upload_mtu}
+MAX_DOWNLOAD_MTU = {max_download_mtu}
 
 # MTU probe retries, timeout, and parallelism.
 # Retries and parallelism must be >= 1.
@@ -2581,7 +2581,7 @@ ARQ_TERMINAL_ACK_WAIT_TIMEOUT_SECONDS = 90.0
 # ------------------------------------------------------------------------------
 
 # Typical values: DEBUG, INFO, WARN, ERROR
-LOG_LEVEL = "INFO"
+LOG_LEVEL = "{log_level}"
 '''
 
 RESOLVER_HEADER = '''\
@@ -4298,16 +4298,49 @@ class App(tk.Tk):
         stem = self._sel_profile
         if not stem:
             return
-        p  = dict(self._profiles[stem])
-        fa = self._lang == "fa"
-        p["name"]    = self._pname_var.get().strip() or p.get("name", stem)
+        p      = dict(self._profiles[stem])
+        fa     = self._lang == "fa"
+        import shutil as _sh
+
+        old_country = p.get("country", "")
+        new_name    = self._pname_var.get().strip() or p.get("name", stem)
+
+        p["name"]    = new_name
         p["options"] = self._read_popt_vars()
+
+        # If the user changed the profile name, use it as the new folder name too
+        # (only if old_country matched the old name, meaning it was auto-named)
+        old_name = self._profiles[stem].get("name", stem)
+        if old_name == old_country and new_name != old_country:
+            new_country = new_name
+        else:
+            new_country = old_country
+
+        # ── Rename output folder if country changed ───────────────
+        if new_country != old_country:
+            old_folder = app_dir() / old_country
+            new_folder = app_dir() / new_country
+            if old_folder.exists() and not new_folder.exists():
+                try:
+                    old_folder.rename(new_folder)
+                    self._log(
+                        f"{'پوشه تغییر نام یافت:' if fa else 'Folder renamed:'} "
+                        f"{old_country} → {new_country}")
+                except Exception as e:
+                    self._log(
+                        f"{'خطا در تغییر نام پوشه:' if fa else 'Folder rename error:'} {e}")
+                    new_country = old_country  # revert if rename failed
+
+        p["country"] = new_country
         update_profile(stem, p)
+
+        # ── Rewrite config files with new options ─────────────────
         try:
             folder = write_profile_files(p)
             self._log(f"{'پروفایل بروزرسانی شد:' if fa else 'Profile updated:'} {folder}")
         except Exception as e:
             self._log(f"{'خطا:' if fa else 'Error:'} {e}")
+
         self._profiles[stem] = p
         self._refresh_profiles_list()
         messagebox.showinfo(

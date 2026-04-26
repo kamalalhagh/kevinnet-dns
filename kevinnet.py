@@ -5068,25 +5068,33 @@ class App(tk.Tk):
             return
 
         try:
-            import subprocess
+            import subprocess, shlex
+            # Quote the folder path so spaces in profile names (e.g. "Turkey 2") work
+            folder_q   = shlex.quote(str(folder))
+            bin_path_q = shlex.quote(str(bin_path))
+
             if sys.platform == "win32":
+                # Windows Popen with cwd handles spaces natively — no quoting needed
                 subprocess.Popen(
                     ["cmd", "/c", "start", "", str(bin_path)],
                     cwd=str(folder)
                 )
             elif sys.platform == "darwin":
+                # AppleScript: wrap path in single quotes inside the do script string
                 script = (
                     'tell application "Terminal"\n'
                     '    activate\n'
-                    f'    do script "cd {folder} && ./{bin_name}"\n'
+                    f'    do script "cd {folder_q} && ./{bin_name}"\n'
                     'end tell'
                 )
                 subprocess.Popen(["osascript", "-e", script])
             else:
                 launched = False
                 for term, args in [
+                    # gnome-terminal / konsole / xfce4 pass cwd as argument — safe with spaces
                     ("gnome-terminal", ["--working-directory", str(folder), "--", str(bin_path)]),
-                    ("xterm",          ["-e", f"cd {folder} && ./{bin_name}"]),
+                    # xterm uses -e with a shell string — must quote
+                    ("xterm",          ["-e", f"cd {folder_q} && {bin_path_q}"]),
                     ("konsole",        ["--workdir", str(folder), "-e", str(bin_path)]),
                     ("xfce4-terminal", ["--working-directory", str(folder), "-e", str(bin_path)]),
                     ("x-terminal-emulator", ["-e", str(bin_path)]),

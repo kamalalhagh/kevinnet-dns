@@ -16,7 +16,7 @@
 
 ## 📥 Download (No installation needed)
 
-Download the latest compiled binary for your platform from the [**Releases page**](../../releases/latest):
+Download the latest stable release for your platform from the [**Releases page**](../../releases/latest):
 
 | Platform | File |
 |---|---|
@@ -25,6 +25,8 @@ Download the latest compiled binary for your platform from the [**Releases page*
 | 🍎 macOS (Intel + Apple Silicon) | `KevinNet_macOS_Universal` |
 | 🐧 Linux x64 | `KevinNet_Linux_x64` |
 | 🐧 Linux ARM64 | `KevinNet_Linux_ARM64` |
+
+> **Looking for the beta with the new Profiles tab?** Check the [**Releases page**](../../releases) and download the latest `v2.x.x-beta` release.
 
 > **macOS:** After downloading:
 > ```bash
@@ -56,8 +58,8 @@ Download the latest compiled binary for your platform from the [**Releases page*
 | **Pool ×1000** | `200` | 200,000 IPs scanned. More = more resolvers found |
 
 > **Tip:** If you find very few resolvers, increase **Pool** to `300` or `500`.
-> Do NOT increase Concurrency — it causes silent failures on macOS/Iran connections.
-> Run the scan 2–3 times and each run finds different resolvers.
+> Do NOT increase Concurrency above 100 — it causes silent failures on macOS and Iranian connections.
+> Run the scan 2–3 times — each run tests a fresh random set of IPs.
 
 ### Step 3 — Start the scan
 
@@ -80,7 +82,135 @@ Click **💾 Save Config Files** — creates a folder (e.g. `Iran/`) next to the
 - `client_resolvers.txt`
 - `MasterDnsVPN` (or `.exe` on Windows)
 
+The profile is also saved to the **Profiles tab** automatically — see below.
+
 Click **🚀 Connect MasterDNSVPN** — opens a terminal and launches the VPN.
+
+---
+
+## 📋 Profiles Tab — Edit Options & Manage Saved Scans
+
+Every time you save after a scan, a **profile** is automatically created and stored in `profiles/` next to the app. You can open any saved profile later — without scanning again — and adjust settings, then save and launch.
+
+### How to use the Profiles tab
+
+1. Click the **📋 Profiles** tab at the top of the app
+2. Select a profile from the left list (shows name, date, and resolver count)
+3. Edit the name or any of the key options on the right
+4. Click **💾 Save Changes** — rewrites `client_config.toml` in the country folder instantly
+5. Click **🚀 Launch VPN** — launches directly from the profile
+6. Click **🗑 Delete** — removes the profile (and optionally the output folder)
+
+### 🔧 Key Options — What they mean and optimal values for Iran
+
+These options are inside every profile and directly affect how MasterDnsVPN performs under Iran's heavy DPI filtering.
+
+---
+
+#### Listen Port
+**Default:** `18000`
+**Iran optimal:** `18000` (leave as-is unless another app uses this port)
+
+The local port your browser or app connects to. For example, in your browser proxy settings you'd set SOCKS5 `127.0.0.1:18000`. Only change this if something else on your machine is already using port 18000.
+
+---
+
+#### Encryption Method
+**Options:** `0 — None`, `1 — XOR`, `2 — ChaCha20`, `3 — AES-128-GCM`, `4 — AES-192-GCM`, `5 — AES-256-GCM`
+**Default:** `1 — XOR`
+**Iran optimal:** `1 — XOR`
+
+Encrypts the payload inside each DNS packet. XOR is the best choice for Iran because:
+- It adds minimal overhead inside already-small DNS packets
+- ChaCha20 or AES are stronger but add bytes that reduce the usable MTU
+- The tunnel domain+key already provides a layer of security
+- Switch to `2 — ChaCha20` only if you need stronger encryption and accept slightly lower throughput
+
+> **Must match your server's `DATA_ENCRYPTION_METHOD` setting exactly.**
+
+---
+
+#### Balancing Strategy
+**Options:** `1 — Random`, `2 — Round Robin`, `3 — Least Loss`, `4 — Lowest Latency`
+**Default:** `2 — Round Robin`
+**Iran optimal:** `3 — Least Loss`
+
+Controls how the client picks which resolver to send each packet through.
+
+- **Random** — simplest, no feedback
+- **Round Robin** — cycles through all resolvers evenly
+- **Least Loss** — favours resolvers with the fewest dropped packets — **best for Iran** because Iranian networks have high and uneven packet loss
+- **Lowest Latency** — favours the fastest resolver — good if your resolvers are very consistent
+
+---
+
+#### Packet Duplication
+**Range:** `1–8`
+**Default:** `2`
+**Iran optimal:** `2–3`
+
+Sends each packet to this many resolvers simultaneously. If one path drops the packet, another copy arrives via a different resolver. In Iran's lossy network environment, `2` is a solid baseline. Set to `3` if you experience frequent disconnections. Do not go above `4` — it wastes bandwidth without benefit when you already have many resolvers.
+
+---
+
+#### Min Upload MTU
+**Range:** `10–500`
+**Default:** `38`
+**Iran optimal:** `38`
+
+The minimum upload payload size (in bytes) accepted after MTU discovery. Resolvers that can only handle smaller packets than this are rejected. `38` is very conservative — almost no resolver gets filtered out on this. Leave it at `38` for Iran to maximise the number of usable resolvers.
+
+---
+
+#### Max Upload MTU
+**Range:** `10–500`
+**Default:** `150`
+**Iran optimal:** `80–100`
+
+The upper bound for upload MTU discovery. MasterDnsVPN probes each resolver to find the largest packet it accepts. In Iran, DNS traffic is heavily inspected — large DNS queries look suspicious and get dropped more often. Keeping this at `80–100` means the client uses smaller, less conspicuous packets that are less likely to trigger DPI.
+
+---
+
+#### Min Download MTU
+**Range:** `100–2000`
+**Default:** `500`
+**Iran optimal:** `400`
+
+Minimum download payload size. Resolvers that return very small DNS responses are rejected. Lowering to `400` keeps more resolvers in the pool — useful in Iran where many resolvers work but respond conservatively.
+
+---
+
+#### Max Download MTU
+**Range:** `100–2000`
+**Default:** `900`
+**Iran optimal:** `700`
+
+Upper bound for download MTU discovery. Large DNS responses (800–900 bytes) are more likely to be fragmented by Iranian ISPs or trigger DPI. Setting this to `700` keeps download packets in a safer zone where they are less likely to be blocked mid-transfer.
+
+---
+
+#### Log Level
+**Options:** `DEBUG`, `INFO`, `WARN`, `ERROR`
+**Default:** `INFO`
+**Iran optimal:** `INFO`
+
+Controls how much MasterDnsVPN prints to its terminal. `INFO` shows connection events, resolver switches, and errors — enough to know what's happening without flooding the terminal. Use `DEBUG` only when troubleshooting a specific problem; it prints every packet event and will be very noisy.
+
+---
+
+### 📊 Quick reference — Iran-optimised profile
+
+| Option | Iran optimal | Reason |
+|---|---|---|
+| Listen Port | `18000` | Default — no conflict typically |
+| Encryption Method | `1 — XOR` | Lowest overhead inside DNS |
+| Balancing Strategy | `3 — Least Loss` | Iran has high uneven packet loss |
+| Packet Duplication | `2–3` | Redundancy on lossy paths |
+| Min Upload MTU | `38` | Keep maximum resolver pool |
+| Max Upload MTU | `80–100` | Smaller queries avoid DPI |
+| Min Download MTU | `400` | Keep marginal resolvers |
+| Max Download MTU | `700` | Avoid ISP fragmentation |
+| Log Level | `INFO` | Normal operation |
 
 ---
 
@@ -108,8 +238,6 @@ If after saving you don't see `MasterDnsVPN` inside the country folder, follow t
 ```bash
 chmod +x /path/to/MasterDnsVPN
 ```
-
-After placing it correctly, the next Save will copy it into every country folder automatically.
 
 ---
 

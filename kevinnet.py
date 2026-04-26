@@ -3430,14 +3430,30 @@ HELP = {
          "مرحله ۳: تأیید واقعی تانل از طریق MasterDnsVPN — فیلتر اصلی"),
         ("۶  روی 💾 ذخیره فایل‌ها کلیک کنید",
          "پوشه کشور ساخته می‌شود با:\n"
-         "• client_config.toml\n"
-         "• client_resolvers.txt\n"
-         "• MasterDnsVPN  (فایل اجرایی VPN)\n"
+         "• client_config.toml  •  client_resolvers.txt  •  MasterDnsVPN\n"
+         "پروفایل به صورت خودکار در تب پروفایل‌ها هم ذخیره می‌شود.\n"
          "اگر MasterDnsVPN در پوشه نبود، آن را از GitHub دانلود کنید\n"
          "و کنار این برنامه بگذارید، سپس دوباره ذخیره کنید."),
         ("۷  روی 🚀 اتصال MasterDNSVPN کلیک کنید",
          "ترمینال باز می‌شود و VPN با فایل‌های ذخیره‌شده راه‌اندازی می‌شود.\n"
          "فقط بعد از ذخیره موفق فعال می‌شود."),
+        ("📋  تب پروفایل‌ها — ویرایش تنظیمات MTU و بیشتر",
+         "هر اسکن ذخیره‌شده یک پروفایل می‌سازد.\n"
+         "در تب پروفایل‌ها می‌توانید:\n"
+         "• پروفایل‌های قبلی را بدون اسکن مجدد باز کنید\n"
+         "• MTU، روش رمزنگاری، بالانس و غیره را تغییر دهید\n"
+         "• تغییرات را ذخیره کنید تا client_config.toml بازنویسی شود\n"
+         "• مستقیم از پروفایل VPN را راه‌اندازی کنید\n"
+         "• پروفایل‌های قدیمی را با خیال راحت حذف کنید"),
+        ("🔧  مقادیر بهینه برای ایران (تنظیمات پروفایل)",
+         "روش رمزنگاری: 1 — XOR  (کمترین سربار در DNS)\n"
+         "استراتژی بالانس: 3 — Least Loss  (افت پکت بالای ایران)\n"
+         "تکرار بسته: 2 یا 3  (افزونگی در شبکه پر افت)\n"
+         "حداکثر MTU آپلود: 80-100  (کوچک‌تر = کمتر DPI trigger)\n"
+         "حداکثر MTU دانلود: 700  (از fragmentation ISP جلوگیری)\n"
+         "حداقل MTU آپلود: 38  (نگه داشتن بیشترین تعداد Resolver)\n"
+         "حداقل MTU دانلود: 400  (Resolverهای مرزی را در pool نگه دار)\n"
+         "سطح لاگ: INFO  (عملکرد عادی؛ DEBUG فقط برای عیب‌یابی)"),
         ("مک — مشکل 'damaged' یا 'cannot be verified'",
          "در ترمینال این دو دستور را بزنید:\n"
          "chmod +x KevinNet_macOS_Universal\n"
@@ -3467,14 +3483,30 @@ HELP = {
          "Phase 3: Real tunnel E2E via MasterDnsVPN — the true filter"),
         ("6  Click 💾 Save Config Files",
          "Creates the country folder with:\n"
-         "• client_config.toml\n"
-         "• client_resolvers.txt\n"
-         "• MasterDnsVPN executable\n"
+         "• client_config.toml  •  client_resolvers.txt  •  MasterDnsVPN\n"
+         "The profile is also saved automatically to the Profiles tab.\n"
          "If MasterDnsVPN is missing, download it from GitHub\n"
          "and place it next to this app, then save again."),
         ("7  Click 🚀 Connect MasterDNSVPN",
          "Opens a terminal and launches the VPN with your saved config.\n"
          "Only becomes active after a successful save."),
+        ("📋  Profiles Tab — Edit MTU and other options",
+         "Every saved scan creates a profile.\n"
+         "In the Profiles tab you can:\n"
+         "• Re-open any previous scan without scanning again\n"
+         "• Change MTU, encryption method, balancing, and more\n"
+         "• Save changes — instantly rewrites client_config.toml\n"
+         "• Launch VPN directly from any profile\n"
+         "• Delete old profiles cleanly"),
+        ("🔧  Iran-optimised values (Profile options)",
+         "Encryption Method: 1 — XOR  (lowest overhead inside DNS)\n"
+         "Balancing Strategy: 3 — Least Loss  (Iran has high packet loss)\n"
+         "Packet Duplication: 2 or 3  (redundancy on lossy paths)\n"
+         "Max Upload MTU: 80–100  (smaller = less likely to trigger DPI)\n"
+         "Max Download MTU: 700  (avoids ISP fragmentation)\n"
+         "Min Upload MTU: 38  (keeps maximum resolver pool)\n"
+         "Min Download MTU: 400  (keeps marginal resolvers in pool)\n"
+         "Log Level: INFO  (normal use; DEBUG only for troubleshooting)"),
         ("macOS — 'damaged' or 'cannot be verified' error",
          "Run these two commands in Terminal:\n"
          "chmod +x KevinNet_macOS_Universal\n"

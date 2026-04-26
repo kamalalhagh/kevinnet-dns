@@ -3743,10 +3743,11 @@ class App(tk.Tk):
         self._q         = queue.Queue()   # thread-safe result queue
 
         # Profiles tab state
-        self._profiles      : dict = {}
-        self._sel_profile   : str | None = None
-        self._pname_var     : tk.StringVar | None = None
-        self._popt_vars     : dict = {}
+        self._profiles         : dict = {}
+        self._sel_profile      : str | None = None
+        self._pname_var        : tk.StringVar | None = None
+        self._popt_vars        : dict = {}
+        self._auto_saved_stem  : str | None = None  # stem of auto-saved profile for current scan
 
         self._build_ui()
         self._set_icon()
@@ -4356,14 +4357,15 @@ class App(tk.Tk):
         stem = self._sel_profile
         if not stem:
             return
-        p      = self._profiles[stem]
-        folder = app_dir() / p.get("country", "output")
-        if not folder.exists():
-            try:
-                folder = write_profile_files(p)
-            except Exception as e:
-                messagebox.showerror("", str(e))
-                return
+        p  = self._profiles[stem]
+        fa = self._lang == "fa"
+        # Always regenerate files so current options are applied
+        # even if the user didn't click Save Changes first
+        try:
+            folder = write_profile_files(p)
+        except Exception as e:
+            messagebox.showerror("", str(e))
+            return
         self._saved_folder = folder
         self._launch_vpn()
 
@@ -4791,6 +4793,7 @@ class App(tk.Tk):
 
         # Reset UI
         self._found_ips.clear()
+        self._auto_saved_stem = None
         for row in self._W["tree"].get_children():
             self._W["tree"].delete(row)
         self._stop_ev.clear()
@@ -5039,8 +5042,8 @@ class App(tk.Tk):
         }
         try:
             folder = write_profile_files(profile)
-            save_new_profile(profile)
-            self._saved_folder = folder
+            self._auto_saved_stem = save_new_profile(profile)
+            self._saved_folder    = folder
             self._log(
                 f"{'✓ ذخیره خودکار با پیش‌فرض — برای تغییر MTU به تب پروفایل‌ها بروید' if fa else '✓ Auto-saved with defaults — go to MasterDNS Profiles tab to edit MTU and options'}")
         except Exception as e:
@@ -5121,78 +5124,37 @@ class App(tk.Tk):
         key     = self._key_var.get().strip()
         country = self._country_var.get().strip()
         ts      = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        folder  = app_dir() / country
-        folder.mkdir(parents=True, exist_ok=True)
+        fa      = self._lang == "fa"
 
-        cfg = (CONFIG_TEMPLATE
-               .replace("{domain}", domain)
-               .replace("{key}", key)
-               .replace("{timestamp}", ts))
-        (folder / "client_config.toml").write_text(cfg, encoding="utf-8")
+        profile = {
+            "name":           country,
+            "date":           ts,
+            "domain":         domain,
+            "key":            key,
+            "country":        country,
+            "resolver_count": len(self._found_ips),
+            "resolvers":      list(self._found_ips),
+            "options":        dict(PROFILE_DEFAULTS),
+        }
 
-        hdr = (RESOLVER_HEADER
-               .replace("{timestamp}", ts)
-               .replace("{country}", country))
-        (folder / "client_resolvers.txt").write_text(
-            hdr + "\n".join(self._found_ips) + "\n", encoding="utf-8")
-
-        fa  = self._lang == "fa"
-
-        # ── Copy MasterDnsVPN executable ────────────────────────
-        import shutil
-        exe_src    = get_masterdns_exe()
-        exe_copied = False
-        exe_note   = ""
-
-        # Debug: log every location checked
-        fa_log = self._lang == "fa"
-        fname  = "MasterDnsVPN.exe" if sys.platform == "win32" else "MasterDnsVPN"
-        self._log(f"{'جستجوی MasterDnsVPN:' if fa_log else 'Looking for MasterDnsVPN:'}")
-        self._log(f"  app_dir = {app_dir()}")
-        self._log(f"  local   = {app_dir() / fname}  exists={( app_dir() / fname).exists()}")
-        if getattr(sys, 'frozen', False):
-            meipass = Path(getattr(sys, '_MEIPASS', 'N/A'))
-            self._log(f"  MEIPASS = {meipass / fname}  exists={(meipass / fname).exists()}")
-        self._log(f"  result  = {exe_src}")
-
-        if exe_src:
-            try:
-                exe_dst = folder / exe_src.name
-                shutil.copy2(str(exe_src), str(exe_dst))
-                if sys.platform != "win32":
-                    exe_dst.chmod(exe_dst.stat().st_mode | 0o111)
-                exe_copied = True
-                self._log(
-                    f"{'فایل اجرایی کپی شد:' if fa else 'Executable copied:'} {exe_src.name}")
-                exe_note = f"\n• {exe_src.name}"
-            except Exception as e:
-                self._log(
-                    f"{'خطا در کپی:' if fa else 'Copy error:'} {e}")
-                exe_note = f"\n  (could not copy: {e})"
-        else:
-            self._log(
-                f"{'فایل MasterDnsVPN یافت نشد — در کنار برنامه قرار دهید' if fa else 'MasterDnsVPN not found — place it next to this app'}")
-            exe_note = (
-                "\n  (MasterDnsVPN.exe not found — place it next to this app)"
-                if sys.platform == "win32" else
-                "\n  (MasterDnsVPN not found — place it next to this app)"
-            )
-
-        # ── Save profile to profiles/ ─────────────────────────────
+        # Write all output files via shared helper (uses build_config_from_profile
+        # which correctly substitutes ALL option placeholders in the TOML)
         try:
-            profile = {
-                "name":           country,
-                "date":           ts,
-                "domain":         domain,
-                "key":            key,
-                "country":        country,
-                "resolver_count": len(self._found_ips),
-                "resolvers":      list(self._found_ips),
-                "options":        dict(PROFILE_DEFAULTS),
-            }
-            save_new_profile(profile)
-            self._log(
-                f"{'پروفایل ذخیره شد — تب پروفایل‌ها را بررسی کنید' if fa else 'Profile saved — check the Profiles tab to edit MTU and options'}")
+            folder = write_profile_files(profile)
+        except Exception as e:
+            messagebox.showerror("", str(e))
+            return
+
+        # Save or update profile JSON — update auto-saved one if it exists,
+        # otherwise create new (prevents duplicate profiles per scan)
+        try:
+            if self._auto_saved_stem:
+                profile["date"] = ts
+                update_profile(self._auto_saved_stem, profile)
+                self._log(f"{'پروفایل بروزرسانی شد' if fa else 'Profile updated'}")
+            else:
+                self._auto_saved_stem = save_new_profile(profile)
+                self._log(f"{'پروفایل ذخیره شد' if fa else 'Profile saved'}")
         except Exception as e:
             self._log(f"{'خطا در ذخیره پروفایل:' if fa else 'Profile save error:'} {e}")
 
@@ -5200,16 +5162,12 @@ class App(tk.Tk):
         self._W["status_lbl"].config(
             text=f"● {'ذخیره شد' if fa else 'Saved'}", fg=ACCENT)
         self._log(f"Saved  →  {folder}")
-        if exe_copied:
-            self._log(
-                f"{'دکمه اتصال آماده است' if fa else 'Connect button ready — click to launch MasterDNSVPN'}")
         messagebox.showinfo(
             "Saved",
             f"{'فایل‌ها ذخیره شدند:' if fa else 'Files saved to:'}"
             f"\n{folder}\n"
             f"\n• client_config.toml"
-            f"\n• client_resolvers.txt"
-            f"{exe_note}\n\n"
+            f"\n• client_resolvers.txt\n\n"
             f"{'برای تغییر MTU به تب پروفایل‌ها بروید' if fa else 'Go to the Profiles tab to edit MTU and other options'}.")
 
 

@@ -19,7 +19,7 @@ if sys.platform == "win32":
 
 try:
     import tkinter as tk
-    from tkinter import messagebox, scrolledtext, ttk
+    from tkinter import messagebox, scrolledtext, ttk, simpledialog
     import tkinter.font as tkfont
 except ImportError:
     import subprocess, platform
@@ -3839,6 +3839,9 @@ class App(tk.Tk):
                         f"{'✓ مرحله ۳ کامل:' if fa else '✓ Phase 3 done:'} "
                         f"{n} {'resolver تأیید E2E شده' if fa else 'E2E-verified resolvers'} "
                         f"{'آماده ذخیره هستند' if fa else 'ready to save'}")
+                    # Auto-save with defaults so Launch VPN works immediately
+                    if verified:
+                        self._save_configs_silent()
         except queue.Empty:
             pass
         except Exception:
@@ -3903,7 +3906,7 @@ class App(tk.Tk):
             W[wkey] = lbl
 
         make_tab("tab_scanner",  "🔍  Scanner",      "🔍  اسکنر",      self._show_scanner)
-        make_tab("tab_profiles", "📋  Profiles",     "📋  پروفایل‌ها",  self._show_profiles)
+        make_tab("tab_profiles", "📋  MasterDNS Profiles", "📋  پروفایل‌های MasterDNS", self._show_profiles)
 
         tk.Frame(self, bg=BORDER, height=1).pack(fill="x")
 
@@ -4162,6 +4165,8 @@ class App(tk.Tk):
                 BLUE,   "#000000", self._profile_save_changes)
         act_btn("pbtn_launch", "🚀 Launch VPN",    "🚀 اتصال",
                 PURPLE, BTN_TEXT,  self._profile_launch)
+        act_btn("pbtn_dupe",   "📋 Duplicate",      "📋 کپی پروفایل",
+                ACCENT, "#000000", self._profile_duplicate)
         act_btn("pbtn_delete", "🗑 Delete",          "🗑 حذف",
                 DANGER, "#000000", self._profile_delete)
 
@@ -4362,6 +4367,59 @@ class App(tk.Tk):
         self._saved_folder = folder
         self._launch_vpn()
 
+    def _profile_duplicate(self):
+        stem = self._sel_profile
+        if not stem:
+            return
+        fa      = self._lang == "fa"
+        src     = dict(self._profiles[stem])
+        import shutil as _sh, copy as _copy
+
+        # Ask for a new name
+        new_name = simpledialog.askstring(
+            "Duplicate" if not fa else "کپی پروفایل",
+            ("New profile name:" if not fa else "نام پروفایل جدید:"),
+            initialvalue=src.get("name", stem) + (" (copy)" if not fa else " (کپی)"),
+            parent=self)
+        if not new_name or not new_name.strip():
+            return
+        new_name = new_name.strip()
+
+        # Build new profile dict
+        new_profile              = _copy.deepcopy(src)
+        new_profile["name"]      = new_name
+        new_profile["country"]   = new_name
+        new_profile["date"]      = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # Duplicate output folder
+        src_folder = app_dir() / src.get("country", stem)
+        dst_folder = app_dir() / new_name
+        if src_folder.exists():
+            try:
+                _sh.copytree(str(src_folder), str(dst_folder))
+                self._log(
+                    f"{'پوشه کپی شد:' if fa else 'Folder duplicated:'} {dst_folder}")
+            except Exception as e:
+                self._log(
+                    f"{'خطا در کپی پوشه:' if fa else 'Folder copy error:'} {e}")
+        else:
+            # No folder yet — just write fresh files
+            try:
+                write_profile_files(new_profile)
+            except Exception as e:
+                self._log(f"{'خطا در نوشتن فایل‌ها:' if fa else 'File write error:'} {e}")
+
+        # Save the new profile JSON
+        new_stem = save_new_profile(new_profile)
+        self._log(
+            f"{'پروفایل کپی شد:' if fa else 'Profile duplicated:'} {new_name}")
+
+        self._refresh_profiles_list()
+        # Select the new profile
+        self._profiles = load_all_profiles()
+        if new_stem in self._profiles:
+            self._select_profile(new_stem)
+
     def _profile_delete(self):
         stem = self._sel_profile
         if not stem:
@@ -4528,7 +4586,6 @@ class App(tk.Tk):
         mk_btn("btn_scan",    "▶  Start Scan",           "▶  شروع اسکن",           ACCENT,    SCAN_FG, self._start_scan)
         mk_btn("btn_stop",    "■  Stop",                  "■  توقف",                DANGER,    "#000000", self._stop_scan,    "disabled")
         mk_btn("btn_save",    "💾  Save Config Files",    "💾  ذخیره فایل‌ها",      BLUE,      SAVE_FG, self._save_configs, "disabled")
-        mk_btn("btn_connect", "🚀  Connect MasterDNSVPN", "🚀  اتصال MasterDNSVPN", PURPLE, BTN_TEXT, self._launch_vpn,   "disabled")
         mk_btn("btn_clear",   "🗑  Clear",                 "🗑  پاک کردن",            BORDER,    CLEAR_FG,self._clear)
 
     # ── RIGHT PANEL ─────────────────────────────────────────────
@@ -4677,7 +4734,6 @@ class App(tk.Tk):
             ("btn_scan",    "▶  شروع اسکن",           "▶  Start Scan"),
             ("btn_stop",    "■  توقف",                "■  Stop"),
             ("btn_save",    "💾  ذخیره فایل‌ها",      "💾  Save Config Files"),
-            ("btn_connect", "🚀  اتصال MasterDNSVPN", "🚀  Connect MasterDNSVPN"),
             ("btn_clear",   "🗑  پاک کردن",            "🗑  Clear"),
         ]:
             W[wkey].config(text=fa_t if fa else en_t,
@@ -4898,6 +4954,7 @@ class App(tk.Tk):
             self._W["btn_scan"].config(state="normal",  bg=ACCENT,  fg="#000000", disabledforeground=DIS_FG)
             if found:
                 self._W["btn_save"].config(state="normal",  bg=BLUE,   fg="#000000", disabledforeground=DIS_FG)
+                self._save_configs_silent()
             self._W["status_lbl"].config(
                 text=f"● {'اتمام' if fa else 'Done'}  —  {found} {'یافت‌شده' if fa else 'found'}",
                 fg=GREEN)
@@ -4953,12 +5010,43 @@ class App(tk.Tk):
         self._W["badge"].config(text=f"0  {'یافت‌شده' if fa else 'found'}")
         self._W["status_lbl"].config(text="● Ready", fg=GREEN)
         self._W["btn_save"].config(state="disabled",    bg="#1a2a4a")
-        self._W["btn_connect"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
         self._W["btn_scan"].config(state="normal",       bg=ACCENT)
         self._W["btn_stop"].config(state="disabled",     bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
         self._saved_folder = None
 
-    # ── SAVE ────────────────────────────────────────────────────
+    def _save_configs_silent(self):
+        """Auto-save with defaults immediately after scan — no dialog.
+        Creates the profile and output files so Launch VPN works straight away."""
+        if not self._found_ips:
+            return
+        domain  = self._domain_var.get().strip()
+        key     = self._key_var.get().strip()
+        country = self._country_var.get().strip()
+        if not domain or not country:
+            return
+        fa = self._lang == "fa"
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        profile = {
+            "name":           country,
+            "date":           ts,
+            "domain":         domain,
+            "key":            key,
+            "country":        country,
+            "resolver_count": len(self._found_ips),
+            "resolvers":      list(self._found_ips),
+            "options":        dict(PROFILE_DEFAULTS),
+        }
+        try:
+            folder = write_profile_files(profile)
+            save_new_profile(profile)
+            self._saved_folder = folder
+            self._log(
+                f"{'✓ ذخیره خودکار با پیش‌فرض — برای تغییر MTU به تب پروفایل‌ها بروید' if fa else '✓ Auto-saved with defaults — go to MasterDNS Profiles tab to edit MTU and options'}")
+        except Exception as e:
+            self._log(f"{'خطا در ذخیره خودکار:' if fa else 'Auto-save error:'} {e}")
+
+        # ── SAVE ────────────────────────────────────────────────────
     def _launch_vpn(self):
         """Launch MasterDnsVPN from the saved country folder in a terminal."""
         fa     = self._lang == "fa"
@@ -5109,7 +5197,6 @@ class App(tk.Tk):
             self._log(f"{'خطا در ذخیره پروفایل:' if fa else 'Profile save error:'} {e}")
 
         self._saved_folder = folder
-        self._W["btn_connect"].config(state="normal",  bg=CONN_BG, fg="#000000", disabledforeground=DIS_FG)
         self._W["status_lbl"].config(
             text=f"● {'ذخیره شد' if fa else 'Saved'}", fg=ACCENT)
         self._log(f"Saved  →  {folder}")

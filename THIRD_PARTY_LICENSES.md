@@ -34,6 +34,21 @@ SOFTWARE.
 
 ---
 
+## VayDNS
+
+This project bundles the VayDNS client binary (`vaydns-client`).
+
+VayDNS is a DNS tunnel with support for DoH, DoT, and plaintext UDP, using
+the Noise protocol for end-to-end encryption.
+
+- **Project:** https://github.com/net2share/vaydns
+- **Original upstream (dnstt):** https://www.bamsoftware.com/software/dnstt/ by David Fifield
+- **License:** Public Domain (original dnstt) / see VayDNS repository for current license
+
+VayDNS is a fork of dnstt by David Fifield. The original dnstt is dedicated to the public domain.
+
+---
+
 ## dnspython
 
 Used for DNS resolution in the scanner.

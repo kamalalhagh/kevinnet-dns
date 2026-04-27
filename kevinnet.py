@@ -4073,14 +4073,15 @@ def write_vaydns_launch_script(profile: dict) -> Path:
 
     # Copy vaydns-client binary if present — keep arch-specific name
     bin_src = get_vaydns_exe()
+    bin_copy_error = None
     if bin_src:
         try:
             dst = folder / bin_src.name
             _sh.copy2(str(bin_src), str(dst))
             if sys.platform != "win32":
                 dst.chmod(dst.stat().st_mode | 0o111)
-        except Exception:
-            pass
+        except Exception as _copy_err:
+            bin_copy_error = str(_copy_err)
 
     # Determine the actual binary name that was copied into the folder
     if bin_src:
@@ -5439,43 +5440,51 @@ class App(tk.Tk):
         if not script.exists():
             messagebox.showerror("", f"Script not found: {script}"); return
 
-        # Check that some vaydns-client binary exists in the folder
-        # (it may be named with arch suffix e.g. vaydns-client-darwin-arm64)
-        bin_src = get_vaydns_exe()
-        bin_in_folder = None
-        if bin_src:
-            bin_in_folder = folder / bin_src.name
-        if not bin_in_folder or not bin_in_folder.exists():
-            # Last-resort: check for generic name too
-            generic = "vaydns-client.exe" if sys.platform == "win32" else "vaydns-client"
-            if (folder / generic).exists():
-                bin_in_folder = folder / generic
+        # Check that a vaydns-client binary exists in the output folder.
+        # Use glob so any naming variant is accepted.
+        # If not there, try copying it now from next to the app.
+        def _find_bin_in_folder(f):
+            for p in sorted(f.glob("vaydns-client*")):
+                if p.suffix not in (".zip", ".gz", ".tar", ".txt", ".md", ".json"):
+                    return p
+            return None
+
+        bin_in_folder = _find_bin_in_folder(folder)
+        if not bin_in_folder:
+            src_bin = get_vaydns_exe()
+            if src_bin:
+                # Binary exists next to app but wasn't copied — copy it now
+                try:
+                    import shutil as _sh2
+                    dst = folder / src_bin.name
+                    _sh2.copy2(str(src_bin), str(dst))
+                    if sys.platform != "win32":
+                        dst.chmod(dst.stat().st_mode | 0o111)
+                    bin_in_folder = dst
+                    self._log(f"{'باینری کپی شد:' if fa else 'Binary copied:'} {dst}")
+                except Exception as _e:
+                    messagebox.showerror("",
+                        f"{'خطا در کپی باینری:' if fa else 'Binary copy failed:'} {_e}")
+                    return
             else:
                 app_folder = app_dir()
                 fa_msg = (
                     f"فایل vaydns-client پیدا نشد.\n\n"
                     f"فایل اجرایی را در کنار برنامه KevinNet قرار دهید:\n{app_folder}\n\n"
-                    f"نام‌های قابل قبول:\n"
-                    f"  vaydns-client-darwin-arm64  (مک Apple Silicon)\n"
-                    f"  vaydns-client-darwin-amd64  (مک Intel)\n"
-                    f"  vaydns-client-linux-amd64\n"
-                    f"  vaydns-client-linux-arm64\n"
-                    f"  vaydns-client_windows_amd64.exe"
+                    f"هر فایلی که با vaydns-client شروع شود قبول می‌شود.\n"
+                    f"مثال: vaydns-client-darwin-arm64"
                 )
                 en_msg = (
                     f"vaydns-client binary not found.\n\n"
                     f"Place the binary next to the KevinNet app:\n{app_folder}\n\n"
-                    f"Accepted names:\n"
-                    f"  vaydns-client-darwin-arm64  (macOS Apple Silicon)\n"
-                    f"  vaydns-client-darwin-amd64  (macOS Intel)\n"
-                    f"  vaydns-client-linux-amd64\n"
-                    f"  vaydns-client-linux-arm64\n"
-                    f"  vaydns-client_windows_amd64.exe"
+                    f"Any file starting with 'vaydns-client' is accepted.\n"
+                    f"Example: vaydns-client-darwin-arm64"
                 )
                 messagebox.showerror(
                     "vaydns-client not found" if not fa else "فایل اجرایی پیدا نشد",
                     en_msg if not fa else fa_msg)
                 return
+
 
         import subprocess, shlex
         folder_q  = shlex.quote(str(folder))

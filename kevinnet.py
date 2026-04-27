@@ -5208,12 +5208,30 @@ class App(tk.Tk):
             if (folder / generic).exists():
                 bin_in_folder = folder / generic
             else:
-                fa_hint = "فایل vaydns-client را در کنار برنامه قرار دهید تا کپی شود"
-                en_hint = "Place vaydns-client binary next to this app to have it copied automatically"
-                messagebox.showerror("",
-                    f"{'Binary not found' if not fa else 'فایل اجرایی پیدا نشد'}"
-                    f"\n{folder}"
-                    f"\n\n{en_hint if not fa else fa_hint}")
+                app_folder = app_dir()
+                fa_msg = (
+                    f"فایل vaydns-client پیدا نشد.\n\n"
+                    f"فایل اجرایی را در کنار برنامه KevinNet قرار دهید:\n{app_folder}\n\n"
+                    f"نام‌های قابل قبول:\n"
+                    f"  vaydns-client-darwin-arm64  (مک Apple Silicon)\n"
+                    f"  vaydns-client-darwin-amd64  (مک Intel)\n"
+                    f"  vaydns-client-linux-amd64\n"
+                    f"  vaydns-client-linux-arm64\n"
+                    f"  vaydns-client_windows_amd64.exe"
+                )
+                en_msg = (
+                    f"vaydns-client binary not found.\n\n"
+                    f"Place the binary next to the KevinNet app:\n{app_folder}\n\n"
+                    f"Accepted names:\n"
+                    f"  vaydns-client-darwin-arm64  (macOS Apple Silicon)\n"
+                    f"  vaydns-client-darwin-amd64  (macOS Intel)\n"
+                    f"  vaydns-client-linux-amd64\n"
+                    f"  vaydns-client-linux-arm64\n"
+                    f"  vaydns-client_windows_amd64.exe"
+                )
+                messagebox.showerror(
+                    "vaydns-client not found" if not fa else "فایل اجرایی پیدا نشد",
+                    en_msg if not fa else fa_msg)
                 return
 
         import subprocess, shlex

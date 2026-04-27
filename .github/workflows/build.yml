@@ -36,7 +36,8 @@ jobs:
           $addData = ""
           if (Test-Path "MasterDnsVPN.exe") { $addData += ' --add-data "MasterDnsVPN.exe;."' }
           if (Test-Path "MasterDnsVPN")     { $addData += ' --add-data "MasterDnsVPN;."' }
-          Get-ChildItem -Filter "vaydns-client*" | ForEach-Object {
+          # Bundle only Windows binaries (.exe) — never darwin/linux binaries
+          Get-ChildItem -Filter "vaydns-client*.exe" | ForEach-Object {
             $addData += " --add-data `"$($_.Name);.`""
             Write-Host "Bundling: $($_.Name)"
           }
@@ -72,7 +73,7 @@ jobs:
           $addData = ""
           if (Test-Path "MasterDnsVPN.exe") { $addData += ' --add-data "MasterDnsVPN.exe;."' }
           if (Test-Path "MasterDnsVPN")     { $addData += ' --add-data "MasterDnsVPN;."' }
-          Get-ChildItem -Filter "vaydns-client*" | ForEach-Object { $addData += " --add-data `"$($_.Name);.`"" }
+          Get-ChildItem -Filter "vaydns-client*.exe" | ForEach-Object { $addData += " --add-data `"$($_.Name);.`"" }
           Invoke-Expression "python -m PyInstaller --onefile --windowed --name KevinNet_Windows_ARM64 --clean$addData kevinnet.py"
       - uses: actions/upload-artifact@v4
         with:
@@ -108,7 +109,10 @@ jobs:
         run: |
           ADD_DATA=""
           [ -f "MasterDnsVPN" ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN:."
-          for f in vaydns-client*; do [ -f "$f" ] && ADD_DATA="$ADD_DATA --add-data $f:." && echo "Bundling: $f"; done
+          # Bundle only the darwin-arm64 binary — never cross-platform binaries
+          for f in vaydns-client*darwin*arm64* vaydns-client*macos*arm64*; do
+            [ -f "$f" ] && ADD_DATA="$ADD_DATA --add-data $f:." && echo "Bundling: $f"
+          done
           .venv/bin/python -m PyInstaller --onefile --name KevinNet_arm64 --clean $ADD_DATA kevinnet.py
           [ ! -f dist/KevinNet_arm64 ] && cp dist/KevinNet_arm64.app/Contents/MacOS/KevinNet_arm64 dist/KevinNet_arm64 || true
           lipo -archs dist/KevinNet_arm64
@@ -153,7 +157,10 @@ jobs:
         run: |
           ADD_DATA=""
           [ -f "MasterDnsVPN" ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN:."
-          for f in vaydns-client*; do [ -f "$f" ] && ADD_DATA="$ADD_DATA --add-data $f:." && echo "Bundling: $f"; done
+          # Bundle only the darwin-amd64 binary
+          for f in vaydns-client*darwin*amd64* vaydns-client*macos*amd64*; do
+            [ -f "$f" ] && ADD_DATA="$ADD_DATA --add-data $f:." && echo "Bundling: $f"
+          done
           arch -x86_64 .venv_x86/bin/python -m PyInstaller --onefile --name KevinNet_x86_64 --clean $ADD_DATA kevinnet.py
           [ ! -f dist/KevinNet_x86_64 ] && cp dist/KevinNet_x86_64.app/Contents/MacOS/KevinNet_x86_64 dist/KevinNet_x86_64 || true
           lipo -archs dist/KevinNet_x86_64
@@ -221,7 +228,9 @@ jobs:
         run: |
           ADD_DATA=""
           [ -f "MasterDnsVPN" ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN:."
-          for f in vaydns-client*; do [ -f "$f" ] && ADD_DATA="$ADD_DATA --add-data $f:." && echo "Bundling: $f"; done
+          for f in vaydns-client*linux*amd64*; do
+            [ -f "$f" ] && ADD_DATA="$ADD_DATA --add-data $f:." && echo "Bundling: $f"
+          done
           python -m PyInstaller --onefile --windowed --name KevinNet_Linux_x64 --clean $ADD_DATA kevinnet.py
       - uses: actions/upload-artifact@v4
         with:
@@ -258,7 +267,9 @@ jobs:
         run: |
           ADD_DATA=""
           [ -f "MasterDnsVPN" ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN:."
-          for f in vaydns-client*; do [ -f "$f" ] && ADD_DATA="$ADD_DATA --add-data $f:." && echo "Bundling: $f"; done
+          for f in vaydns-client*linux*arm64*; do
+            [ -f "$f" ] && ADD_DATA="$ADD_DATA --add-data $f:." && echo "Bundling: $f"
+          done
           python -m PyInstaller --onefile --windowed --name KevinNet_Linux_ARM64 --clean $ADD_DATA kevinnet.py
       - uses: actions/upload-artifact@v4
         with:

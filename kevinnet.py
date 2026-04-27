@@ -4273,19 +4273,37 @@ def get_vaydns_exe() -> Path | None:
     if getattr(sys, "frozen", False):
         search_dirs.append(Path(getattr(sys, "_MEIPASS", "")))
 
+    # Platform keywords used to filter glob results so a darwin binary
+    # bundled in _MEIPASS is never returned on Windows/Linux and vice versa.
+    if sys.platform == "win32":
+        plat_keywords = ("windows", "win")
+        reject_keywords = ("darwin", "linux", "macos", "mac")
+    elif sys.platform == "darwin":
+        plat_keywords = ("darwin", "macos", "mac")
+        reject_keywords = ("windows", "win", "linux")
+    else:
+        plat_keywords = ("linux",)
+        reject_keywords = ("darwin", "macos", "mac", "windows", "win")
+
     for d in search_dirs:
         # 1. Try exact candidate names first
         for fname in candidates:
             p = d / fname
             if p.exists():
                 return p
-        # 2. Glob fallback — catch any naming variant the user might have used
-        #    e.g. vaydns-client_darwin_arm64, vaydns-client-macos-arm64, etc.
-        matches = sorted(d.glob("vaydns-client*"))
-        for p in matches:
-            # Skip .zip, .tar.gz etc — only actual executables
-            if p.suffix not in (".zip", ".gz", ".tar", ".txt", ".md"):
-                return p
+        # 2. Glob fallback — catch naming variants, but only for the right platform
+        for p in sorted(d.glob("vaydns-client*")):
+            name_lower = p.name.lower()
+            if p.suffix in (".zip", ".gz", ".tar", ".txt", ".md", ".json"):
+                continue
+            # Reject binaries explicitly for another platform
+            if any(kw in name_lower for kw in reject_keywords):
+                continue
+            # On Windows require a platform match or .exe; on others accept generic
+            if sys.platform == "win32":
+                if not (any(kw in name_lower for kw in plat_keywords) or p.suffix == ".exe"):
+                    continue
+            return p
     return None
 
 # ═══════════════════════════════════════════════════════════════
@@ -5444,9 +5462,25 @@ class App(tk.Tk):
         # Use glob so any naming variant is accepted.
         # If not there, try copying it now from next to the app.
         def _find_bin_in_folder(f):
+            if sys.platform == "win32":
+                reject_kw = ("darwin", "linux", "macos", "mac")
+                accept_kw = ("windows", "win")
+            elif sys.platform == "darwin":
+                reject_kw = ("windows", "win", "linux")
+                accept_kw = ("darwin", "macos", "mac")
+            else:
+                reject_kw = ("darwin", "macos", "mac", "windows", "win")
+                accept_kw = ("linux",)
             for p in sorted(f.glob("vaydns-client*")):
-                if p.suffix not in (".zip", ".gz", ".tar", ".txt", ".md", ".json"):
-                    return p
+                n = p.name.lower()
+                if p.suffix in (".zip", ".gz", ".tar", ".txt", ".md", ".json"):
+                    continue
+                if any(kw in n for kw in reject_kw):
+                    continue
+                if sys.platform == "win32":
+                    if not (any(kw in n for kw in accept_kw) or p.suffix == ".exe"):
+                        continue
+                return p
             return None
 
         bin_in_folder = _find_bin_in_folder(folder)

@@ -3714,6 +3714,208 @@ def write_profile_files(profile: dict):
             pass
     return folder
 
+
+# ═══════════════════════════════════════════════════════════════
+#  VAYDNS PROFILES
+# ═══════════════════════════════════════════════════════════════
+
+VAYDNS_DEFAULTS: dict = {
+    "transport":     "udp",
+    "listen_port":   7000,
+    "max_qname_len": 101,
+    "idle_timeout":  "10s",
+    "keepalive":     "2s",
+    "log_level":     "info",
+    "record_type":   "txt",
+}
+
+VAYDNS_TRANSPORT_LABELS = [
+    "udp — Plaintext UDP  (port 53)",
+    "doh — DNS over HTTPS",
+    "dot — DNS over TLS   (port 853)",
+]
+VAYDNS_RECORD_LABELS = ["txt", "null", "cname", "a", "aaaa", "ns", "mx"]
+VAYDNS_LOG_LABELS    = ["debug", "info", "warning", "error"]
+
+
+def vaydns_profiles_dir() -> Path:
+    d = app_dir() / "vaydns_profiles"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+def load_all_vaydns_profiles() -> dict:
+    import json as _json
+    result = {}
+    files  = sorted(
+        vaydns_profiles_dir().glob("*.json"),
+        key=lambda p: p.stat().st_mtime,
+        reverse=True,
+    )
+    for f in files:
+        try:
+            result[f.stem] = _json.loads(f.read_text(encoding="utf-8"))
+        except Exception:
+            pass
+    return result
+
+
+def save_new_vaydns_profile(profile: dict) -> str:
+    import json as _json
+    safe  = "".join(
+        c if c.isalnum() or c in "-_ " else "_"
+        for c in profile.get("name", "vaydns")
+    ).strip().replace(" ", "_")
+    ts    = datetime.now().strftime("%Y%m%d_%H%M%S")
+    fname = f"vd_{safe}_{ts}.json"
+    (vaydns_profiles_dir() / fname).write_text(
+        _json.dumps(profile, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    return fname[:-5]
+
+
+def update_vaydns_profile(stem: str, profile: dict):
+    import json as _json
+    (vaydns_profiles_dir() / f"{stem}.json").write_text(
+        _json.dumps(profile, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+
+
+def delete_vaydns_profile(stem: str) -> str | None:
+    path = vaydns_profiles_dir() / f"{stem}.json"
+    country = None
+    if path.exists():
+        try:
+            import json as _json
+            country = _json.loads(path.read_text(encoding="utf-8")).get("country", "")
+        except Exception:
+            pass
+        path.unlink()
+    return country
+
+
+def build_vaydns_command(profile: dict, resolver: str) -> str:
+    """Return the full vaydns-client shell command for a single resolver."""
+    opts      = {**VAYDNS_DEFAULTS, **profile.get("options", {})}
+    domain    = profile.get("domain", "")
+    pubkey    = profile.get("pubkey", "")
+    transport = opts["transport"]
+    listen    = f"127.0.0.1:{opts['listen_port']}"
+    bin_name  = "vaydns-client.exe" if sys.platform == "win32" else "./vaydns-client"
+
+    if transport == "udp":
+        transport_flag = f"-udp {resolver}"
+    elif transport == "doh":
+        transport_flag = f"-doh {resolver}"
+    else:  # dot
+        transport_flag = f"-dot {resolver}"
+
+    cmd = (
+        f"{bin_name} "
+        f"{transport_flag} "
+        f"-pubkey {pubkey} "
+        f"-domain {domain} "
+        f"-listen {listen} "
+        f"-max-qname-len {opts['max_qname_len']} "
+        f"-idle-timeout {opts['idle_timeout']} "
+        f"-keepalive {opts['keepalive']} "
+        f"-record-type {opts['record_type']} "
+        f"-log-level {opts['log_level']}"
+    )
+    return cmd
+
+
+def write_vaydns_launch_script(profile: dict) -> Path:
+    """Write run.sh (or run.bat) to the profile folder and return its path."""
+    import shutil as _sh
+    opts      = {**VAYDNS_DEFAULTS, **profile.get("options", {})}
+    country   = profile.get("country", "vaydns_output")
+    resolvers = profile.get("resolvers", [])
+    transport = opts["transport"]
+    folder    = app_dir() / country
+    folder.mkdir(parents=True, exist_ok=True)
+
+    # Build resolver address list
+    # For UDP: append :53 to raw IPs from the scan
+    # For DoH/DoT: profile stores a single custom address
+    if transport == "udp":
+        resolver_addrs = [
+            r if ":" in r else f"{r}:53"
+            for r in resolvers[:20]   # cap at 20 for the script
+        ] or ["8.8.8.8:53"]
+    else:
+        # For DoH/DoT a custom resolver URL/addr is stored in options
+        custom = opts.get("custom_resolver", "")
+        resolver_addrs = [custom] if custom else [""]
+
+    # Copy vaydns-client binary if present
+    bin_src  = get_vaydns_exe()
+    bin_name = "vaydns-client.exe" if sys.platform == "win32" else "vaydns-client"
+    if bin_src:
+        try:
+            _sh.copy2(str(bin_src), str(folder / bin_src.name))
+            if sys.platform != "win32":
+                (folder / bin_src.name).chmod(
+                    (folder / bin_src.name).stat().st_mode | 0o111)
+        except Exception:
+            pass
+
+    # --- Shell script (macOS / Linux) ---
+    if sys.platform != "win32":
+        lines = ["#!/bin/bash", "set -e", "",
+                 "# Auto-generated by KevinNet DNS — VayDNS launcher",
+                 f"# Profile: {profile.get('name','')}",
+                 f"# Domain:  {profile.get('domain','')}",
+                 ""]
+        if transport == "udp":
+            lines += [
+                "RESOLVERS=(", *[f'  "{r}"' for r in resolver_addrs], ")", "",
+                'for RESOLVER in "${RESOLVERS[@]}"; do',
+                '  echo "[vaydns] trying resolver: $RESOLVER"',
+                f"  {build_vaydns_command(profile, '"$RESOLVER"')}",
+                '  echo "[vaydns] disconnected from $RESOLVER, trying next..."',
+                "done",
+                'echo "[vaydns] all resolvers exhausted"',
+            ]
+        else:
+            addr = resolver_addrs[0]
+            lines += [build_vaydns_command(profile, addr)]
+
+        script_path = folder / "run.sh"
+        script_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        script_path.chmod(script_path.stat().st_mode | 0o111)
+        return script_path
+
+    # --- Batch script (Windows) ---
+    lines = ["@echo off",
+             "REM Auto-generated by KevinNet DNS — VayDNS launcher",
+             f"REM Profile: {profile.get('name','')}",
+             ""]
+    if transport == "udp":
+        for r in resolver_addrs:
+            lines.append(f"echo Trying {r}")
+            lines.append(build_vaydns_command(profile, r).replace("./vaydns-client", "vaydns-client.exe"))
+    else:
+        addr = resolver_addrs[0]
+        lines.append(build_vaydns_command(profile, addr).replace("./vaydns-client", "vaydns-client.exe"))
+    lines += ["pause"]
+    script_path = folder / "run.bat"
+    script_path.write_text("\r\n".join(lines) + "\r\n", encoding="utf-8")
+    return script_path
+
+
+def get_vaydns_exe() -> Path | None:
+    """Find the vaydns-client binary next to the app or in _MEIPASS."""
+    fname = "vaydns-client.exe" if sys.platform == "win32" else "vaydns-client"
+    local = app_dir() / fname
+    if local.exists():
+        return local
+    if getattr(sys, "frozen", False):
+        bundled = Path(getattr(sys, "_MEIPASS", "")) / fname
+        if bundled.exists():
+            return bundled
+    return None
+
 # ═══════════════════════════════════════════════════════════════
 #  MAIN APPLICATION
 # ═══════════════════════════════════════════════════════════════
@@ -3742,12 +3944,19 @@ class App(tk.Tk):
         self._W         : dict = {}
         self._q         = queue.Queue()   # thread-safe result queue
 
-        # Profiles tab state
+        # MasterDNS Profiles tab state
         self._profiles         : dict = {}
         self._sel_profile      : str | None = None
         self._pname_var        : tk.StringVar | None = None
         self._popt_vars        : dict = {}
-        self._auto_saved_stem  : str | None = None  # stem of auto-saved profile for current scan
+        self._auto_saved_stem  : str | None = None
+
+        # VayDNS Profiles tab state
+        self._vd_profiles      : dict = {}
+        self._vd_sel_profile   : str | None = None
+        self._vd_pname_var     : tk.StringVar | None = None
+        self._vd_popt_vars     : dict = {}
+        self._vd_pubkey_var    : tk.StringVar | None = None  # scanner field
 
         self._build_ui()
         self._set_icon()
@@ -3830,6 +4039,7 @@ class App(tk.Tk):
                     self._W["btn_scan"].config(state="normal",  bg=ACCENT,  fg="#000000", disabledforeground=DIS_FG)
                     if verified:
                         self._W["btn_save"].config(state="normal",  bg=BLUE,   fg="#000000", disabledforeground=DIS_FG)
+                        self._W["btn_vd_save"].config(state="normal", bg=PURPLE, fg=BTN_TEXT, disabledforeground=DIS_FG)
                     n = len(verified)
                     self._W["badge"].config(
                         text=f"{n}  {'تأیید E2E' if fa else 'E2E verified'}")
@@ -3905,13 +4115,15 @@ class App(tk.Tk):
             W[wkey] = lbl
 
         make_tab("tab_scanner",  "🔍  Scanner",      "🔍  اسکنر",      self._show_scanner)
-        make_tab("tab_profiles", "📋  MasterDNS Profiles", "📋  پروفایل‌های MasterDNS", self._show_profiles)
+        make_tab("tab_profiles",    "📋  MasterDNS Profiles", "📋  MasterDNS",  self._show_profiles)
+        make_tab("tab_vd_profiles", "📋  VayDNS Profiles",    "📋  VayDNS",      self._show_vd_profiles)
 
         tk.Frame(self, bg=BORDER, height=1).pack(fill="x")
 
-        # ── CONTENT AREA — two views, only one shown at a time ───
-        self._scanner_view  = tk.Frame(self, bg=BG)
-        self._profiles_view = tk.Frame(self, bg=BG)
+        # ── CONTENT AREA — three views, only one shown at a time ─
+        self._scanner_view    = tk.Frame(self, bg=BG)
+        self._profiles_view   = tk.Frame(self, bg=BG)
+        self._vd_profiles_view = tk.Frame(self, bg=BG)
 
         # ── Scanner view (original layout) ───────────────────────
         body = self._scanner_view
@@ -3963,8 +4175,9 @@ class App(tk.Tk):
                    padx=(0, 16), pady=14)
         self._build_right(right)
 
-        # ── Profiles view ─────────────────────────────────────────
+        # ── Profiles views ───────────────────────────────────────
         self._build_profiles_tab(self._profiles_view)
+        self._build_vd_profiles_tab(self._vd_profiles_view)
 
         # Start on Scanner tab
         self._show_scanner()
@@ -3987,16 +4200,29 @@ class App(tk.Tk):
     # ── TAB SWITCHING ────────────────────────────────────────────
     def _show_scanner(self):
         self._profiles_view.pack_forget()
+        self._vd_profiles_view.pack_forget()
         self._scanner_view.pack(fill="both", expand=True)
         self._W["tab_scanner"].config(bg=ACCENT, fg="#000000")
         self._W["tab_profiles"].config(bg=PANEL, fg=MUTED)
+        self._W["tab_vd_profiles"].config(bg=PANEL, fg=MUTED)
 
     def _show_profiles(self):
         self._scanner_view.pack_forget()
+        self._vd_profiles_view.pack_forget()
         self._profiles_view.pack(fill="both", expand=True)
         self._W["tab_scanner"].config(bg=PANEL, fg=MUTED)
         self._W["tab_profiles"].config(bg=ACCENT, fg="#000000")
+        self._W["tab_vd_profiles"].config(bg=PANEL, fg=MUTED)
         self._refresh_profiles_list()
+
+    def _show_vd_profiles(self):
+        self._scanner_view.pack_forget()
+        self._profiles_view.pack_forget()
+        self._vd_profiles_view.pack(fill="both", expand=True)
+        self._W["tab_scanner"].config(bg=PANEL, fg=MUTED)
+        self._W["tab_profiles"].config(bg=PANEL, fg=MUTED)
+        self._W["tab_vd_profiles"].config(bg=ACCENT, fg="#000000")
+        self._vd_refresh_profiles_list()
 
     # ── PROFILES TAB ─────────────────────────────────────────────
     def _build_profiles_tab(self, parent):
@@ -4447,6 +4673,418 @@ class App(tk.Tk):
         self._show_profile_detail(False)
         self._refresh_profiles_list()
 
+
+    # ── VAYDNS PROFILES TAB ──────────────────────────────────────
+    def _build_vd_profiles_tab(self, parent):
+        W  = self._W
+        fa = self._lang == "fa"
+
+        cols = tk.Frame(parent, bg=BG)
+        cols.pack(fill="both", expand=True, padx=16, pady=14)
+
+        # ── Left: profile list ────────────────────────────────────
+        list_frame = tk.Frame(cols, bg=CARD, width=230,
+                              highlightbackground=BORDER, highlightthickness=1)
+        list_frame.pack(side="left", fill="y", padx=(0, 12))
+        list_frame.pack_propagate(False)
+
+        tk.Label(list_frame,
+                 text="پروفایل‌های VayDNS" if fa else "VayDNS Profiles",
+                 bg=BORDER, fg=MUTED, font=F(9, "bold"),
+                 padx=12, pady=7, anchor="w").pack(fill="x")
+
+        lc = tk.Canvas(list_frame, bg=CARD, bd=0, highlightthickness=0)
+        ls = ttk.Scrollbar(list_frame, orient="vertical", command=lc.yview)
+        ls.pack(side="right", fill="y")
+        lc.pack(side="left", fill="both", expand=True)
+
+        self._vd_plist_inner = tk.Frame(lc, bg=CARD)
+        self._vd_plist_win   = lc.create_window((0,0), window=self._vd_plist_inner, anchor="nw")
+        self._vd_plist_inner.bind("<Configure>", lambda e: lc.configure(scrollregion=lc.bbox("all")))
+        lc.bind("<Configure>", lambda e: lc.itemconfig(self._vd_plist_win, width=e.width))
+        W["vd_plist_canvas"] = lc
+
+        # ── Right: detail ─────────────────────────────────────────
+        det_outer = tk.Frame(cols, bg=BG)
+        det_outer.pack(side="left", fill="both", expand=True)
+
+        W["vd_pdetail_empty"] = tk.Label(
+            det_outer,
+            text="یک پروفایل VayDNS انتخاب کنید" if fa
+                 else "Select a VayDNS profile to view or edit",
+            bg=BG, fg=MUTED, font=F(12))
+        W["vd_pdetail_empty"].pack(expand=True)
+
+        dc = tk.Canvas(det_outer, bg=BG, bd=0, highlightthickness=0)
+        ds = ttk.Scrollbar(det_outer, orient="vertical", command=dc.yview)
+        ds.pack(side="right", fill="y")
+        dc.pack(side="left", fill="both", expand=True)
+
+        detail  = tk.Frame(dc, bg=BG)
+        det_win = dc.create_window((0,0), window=detail, anchor="nw")
+        detail.bind("<Configure>", lambda e: dc.configure(scrollregion=dc.bbox("all")))
+        dc.bind("<Configure>", lambda e: dc.itemconfig(det_win, width=e.width))
+
+        W["vd_pdetail_scroll"]    = dc
+        W["vd_pdetail_frame"]     = detail
+        W["vd_pdetail_scrollbar"] = ds
+        dc.pack_forget(); ds.pack_forget()
+
+        def card(parent, en_hdr, fa_hdr, col=ACCENT):
+            c = tk.Frame(parent, bg=CARD,
+                         highlightbackground=BORDER, highlightthickness=1)
+            c.pack(fill="x", pady=(0, 10))
+            tk.Label(c, text=fa_hdr if fa else en_hdr,
+                     bg=BORDER, fg=col, font=F(10, "bold"),
+                     padx=12, pady=6, anchor="w").pack(fill="x")
+            inner = tk.Frame(c, bg=CARD)
+            inner.pack(fill="x", padx=14, pady=8)
+            return inner
+
+        # Card: info
+        meta = card(detail, "⚙  Profile Info", "⚙  اطلاعات پروفایل")
+        tk.Label(meta, text="نام پروفایل" if fa else "Profile Name",
+                 bg=CARD, fg=MUTED, font=F(9), anchor="w").pack(fill="x")
+        self._vd_pname_var = tk.StringVar()
+        tk.Entry(meta, textvariable=self._vd_pname_var,
+                 bg=INPUT, fg=TEXT, insertbackground=ACCENT,
+                 relief="flat", bd=0, font=FM(11),
+                 highlightbackground=BORDER, highlightthickness=1,
+                 highlightcolor=ACCENT).pack(fill="x", ipady=8, pady=(2,6))
+        W["vd_pmeta_info"] = tk.Label(meta, text="", bg=CARD, fg=MUTED,
+                                       font=F(9), anchor="w", justify="left")
+        W["vd_pmeta_info"].pack(fill="x")
+
+        # Card: VayDNS options
+        opt = card(detail, "🔧  VayDNS Options", "🔧  تنظیمات VayDNS", BLUE)
+        vd_opt = {}
+
+        def opt_row(wkey, en_lbl, fa_lbl, widget_builder):
+            row = tk.Frame(opt, bg=CARD)
+            row.pack(fill="x", pady=3)
+            tk.Label(row, text=fa_lbl if fa else en_lbl,
+                     bg=CARD, fg=TEXT,
+                     font=FA(9) if fa else F(9),
+                     anchor="w", width=22).pack(side="left")
+            widget_builder(row, wkey)
+
+        def spinbox_b(lo, hi, default):
+            def make(parent, wkey):
+                var = tk.IntVar(value=default)
+                tk.Spinbox(parent, from_=lo, to=hi, textvariable=var,
+                           bg=INPUT, fg=TEXT, insertbackground=ACCENT,
+                           buttonbackground=BORDER, relief="flat", bd=0,
+                           font=FM(10), width=9,
+                           highlightbackground=BORDER, highlightthickness=1,
+                           highlightcolor=ACCENT).pack(side="left")
+                vd_opt[wkey] = var
+            return make
+
+        def combo_b(values, default):
+            def make(parent, wkey):
+                var = tk.StringVar(value=default)
+                ttk.Combobox(parent, textvariable=var, values=values,
+                             state="readonly", width=28, font=FM(10)).pack(side="left")
+                vd_opt[wkey] = var
+            return make
+
+        def entry_b(default, width=20):
+            def make(parent, wkey):
+                var = tk.StringVar(value=default)
+                tk.Entry(parent, textvariable=var, bg=INPUT, fg=TEXT,
+                         insertbackground=ACCENT, relief="flat", bd=0,
+                         font=FM(10), width=width,
+                         highlightbackground=BORDER, highlightthickness=1,
+                         highlightcolor=ACCENT).pack(side="left", ipady=4)
+                vd_opt[wkey] = var
+            return make
+
+        opt_row("transport",       "Transport",         "نوع انتقال",
+                combo_b(VAYDNS_TRANSPORT_LABELS, VAYDNS_TRANSPORT_LABELS[0]))
+        opt_row("listen_port",     "Listen Port",       "پورت محلی",
+                spinbox_b(1024, 65535, 7000))
+        opt_row("resolver",        "Resolver (UDP IP or DoH URL)", "Resolver",
+                entry_b("", width=26))
+        opt_row("max_qname_len",   "Max QNAME Length",  "حداکثر طول QNAME",
+                spinbox_b(50, 253, 101))
+        opt_row("idle_timeout",    "Idle Timeout",      "Idle Timeout",
+                entry_b("10s", width=8))
+        opt_row("keepalive",       "Keepalive",         "Keepalive",
+                entry_b("2s", width=8))
+        opt_row("record_type",     "Record Type",       "نوع رکورد",
+                combo_b(VAYDNS_RECORD_LABELS, "txt"))
+        opt_row("log_level",       "Log Level",         "سطح لاگ",
+                combo_b(VAYDNS_LOG_LABELS, "info"))
+
+        self._vd_popt_vars = vd_opt
+
+        # Action buttons
+        btn_row = tk.Frame(detail, bg=BG)
+        btn_row.pack(fill="x", pady=(4, 14))
+
+        def act_btn(wkey, en, fa_t, bg_c, fg_c, cmd):
+            b = tk.Button(btn_row, text=fa_t if fa else en,
+                          bg=bg_c, fg=fg_c,
+                          font=F(10, "bold"), relief="flat", bd=0,
+                          padx=14, pady=9, cursor="hand2",
+                          activebackground=bg_c, activeforeground=fg_c,
+                          command=cmd)
+            b.pack(side="left", padx=(0, 6))
+            W[wkey] = b
+
+        act_btn("vd_pbtn_save",   "💾 Save Changes",  "💾 ذخیره",       BLUE,   "#000000", self._vd_profile_save_changes)
+        act_btn("vd_pbtn_launch", "🚀 Launch VPN",    "🚀 اتصال",        PURPLE, BTN_TEXT,  self._vd_profile_launch)
+        act_btn("vd_pbtn_dupe",   "📋 Duplicate",      "📋 کپی",          ACCENT, "#000000", self._vd_profile_duplicate)
+        act_btn("vd_pbtn_delete", "🗑 Delete",          "🗑 حذف",          DANGER, "#000000", self._vd_profile_delete)
+
+    def _vd_show_detail(self, show: bool):
+        W = self._W
+        if show:
+            W["vd_pdetail_empty"].pack_forget()
+            W["vd_pdetail_scroll"].pack(side="left", fill="both", expand=True)
+            W["vd_pdetail_scrollbar"].pack(side="right", fill="y")
+        else:
+            W["vd_pdetail_scroll"].pack_forget()
+            W["vd_pdetail_scrollbar"].pack_forget()
+            W["vd_pdetail_empty"].pack(expand=True)
+
+    def _vd_refresh_profiles_list(self):
+        self._vd_profiles = load_all_vaydns_profiles()
+        inner = self._vd_plist_inner
+        for w in inner.winfo_children():
+            w.destroy()
+        fa = self._lang == "fa"
+
+        if not self._vd_profiles:
+            tk.Label(inner,
+                     text="هنوز پروفایل VayDNS ندارید\nابتدا اسکن انجام دهید" if fa
+                          else "No VayDNS profiles yet.\nRun a scan first.",
+                     bg=CARD, fg=MUTED, font=FA(9) if fa else F(9),
+                     justify="center", padx=12, pady=20).pack()
+            self._vd_sel_profile = None
+            self._vd_show_detail(False)
+            return
+
+        for stem, p in self._vd_profiles.items():
+            self._vd_make_profile_row(inner, stem, p)
+
+        target = self._vd_sel_profile if self._vd_sel_profile in self._vd_profiles else next(iter(self._vd_profiles))
+        self._vd_select_profile(target)
+
+    def _vd_make_profile_row(self, parent, stem, p):
+        fa   = self._lang == "fa"
+        name = p.get("name", stem)
+        date = p.get("date", "")[:10]
+        cnt  = p.get("resolver_count", len(p.get("resolvers", [])))
+        opts = p.get("options", {})
+        transport = opts.get("transport", "udp")
+
+        row     = tk.Frame(parent, bg=CARD, cursor="hand2")
+        row.pack(fill="x")
+        sel_bar = tk.Frame(row, bg=CARD, width=3)
+        sel_bar.pack(side="left", fill="y")
+        info    = tk.Frame(row, bg=CARD)
+        info.pack(side="left", fill="x", expand=True, padx=8, pady=8)
+        name_lbl = tk.Label(info, text=name, bg=CARD, fg=TEXT,
+                            font=F(10, "bold"), anchor="w")
+        name_lbl.pack(fill="x")
+        tk.Label(info, text=f"{date}  ·  {cnt} resolvers  ·  {transport}",
+                 bg=CARD, fg=MUTED, font=F(8), anchor="w").pack(fill="x")
+        tk.Frame(parent, bg=BORDER, height=1).pack(fill="x")
+
+        def _click(e, s=stem):
+            self._vd_select_profile(s)
+        for w in (row, sel_bar, info, name_lbl):
+            w.bind("<Button-1>", _click)
+
+        row._stem = stem; row._sel_bar = sel_bar; row._name_lbl = name_lbl
+
+    def _vd_select_profile(self, stem: str):
+        self._vd_sel_profile = stem
+        p   = self._vd_profiles.get(stem, {})
+        fa  = self._lang == "fa"
+        W   = self._W
+        opts = {**VAYDNS_DEFAULTS, **p.get("options", {})}
+        cnt  = p.get("resolver_count", len(p.get("resolvers", [])))
+
+        for row in self._vd_plist_inner.winfo_children():
+            if isinstance(row, tk.Frame) and hasattr(row, "_stem"):
+                sel = row._stem == stem
+                row._sel_bar.config(bg=ACCENT if sel else CARD)
+                row._name_lbl.config(fg=ACCENT if sel else TEXT)
+
+        self._vd_pname_var.set(p.get("name", stem))
+        domain_lbl = "دامنه" if fa else "Domain"
+        saved_lbl  = "تاریخ" if fa else "Saved"
+        W["vd_pmeta_info"].config(
+            text=(f"{domain_lbl}: {p.get('domain','')}\n"
+                  f"Pubkey: {p.get('pubkey','')[:16]}...\n"
+                  f"Resolvers: {cnt}    {saved_lbl}: {p.get('date','')}"))
+
+        vo = self._vd_popt_vars
+        transport = opts.get("transport", "udp")
+        t_match = next((l for l in VAYDNS_TRANSPORT_LABELS if l.startswith(transport)), VAYDNS_TRANSPORT_LABELS[0])
+        vo["transport"].set(t_match)
+        vo["listen_port"].set(opts.get("listen_port", 7000))
+        vo["resolver"].set(opts.get("custom_resolver", ""))
+        vo["max_qname_len"].set(opts.get("max_qname_len", 101))
+        vo["idle_timeout"].set(opts.get("idle_timeout", "10s"))
+        vo["keepalive"].set(opts.get("keepalive", "2s"))
+        rtype = opts.get("record_type", "txt")
+        vo["record_type"].set(rtype if rtype in VAYDNS_RECORD_LABELS else "txt")
+        loglvl = opts.get("log_level", "info")
+        vo["log_level"].set(loglvl if loglvl in VAYDNS_LOG_LABELS else "info")
+
+        self._vd_show_detail(True)
+
+    def _vd_read_opt_vars(self) -> dict:
+        vo = self._vd_popt_vars
+        transport_str = vo["transport"].get()
+        transport_key = transport_str.split(" — ")[0].strip()
+        return {
+            "transport":        transport_key,
+            "listen_port":      vo["listen_port"].get(),
+            "custom_resolver":  vo["resolver"].get().strip(),
+            "max_qname_len":    vo["max_qname_len"].get(),
+            "idle_timeout":     vo["idle_timeout"].get().strip(),
+            "keepalive":        vo["keepalive"].get().strip(),
+            "record_type":      vo["record_type"].get(),
+            "log_level":        vo["log_level"].get(),
+        }
+
+    def _vd_profile_save_changes(self):
+        stem = self._vd_sel_profile
+        if not stem: return
+        p  = dict(self._vd_profiles[stem])
+        fa = self._lang == "fa"
+        p["name"]    = self._vd_pname_var.get().strip() or p.get("name", stem)
+        p["options"] = self._vd_read_opt_vars()
+        update_vaydns_profile(stem, p)
+        try:
+            script = write_vaydns_launch_script(p)
+            self._log(f"{'VayDNS پروفایل بروزرسانی شد:' if fa else 'VayDNS profile updated:'} {script.parent}")
+        except Exception as e:
+            self._log(f"{'خطا:' if fa else 'Error:'} {e}")
+        self._vd_profiles[stem] = p
+        self._vd_refresh_profiles_list()
+        messagebox.showinfo("Saved" if not fa else "ذخیره شد",
+                            "تغییرات ذخیره شد" if fa else "Changes saved and launch script regenerated.")
+
+    def _vd_profile_launch(self):
+        stem = self._vd_sel_profile
+        if not stem: return
+        p      = self._vd_profiles[stem]
+        fa     = self._lang == "fa"
+        opts   = {**VAYDNS_DEFAULTS, **p.get("options", {})}
+        folder = app_dir() / p.get("country", "vaydns_output")
+
+        # Regenerate script with latest options
+        try:
+            script = write_vaydns_launch_script(p)
+        except Exception as e:
+            messagebox.showerror("", str(e)); return
+
+        if not script.exists():
+            messagebox.showerror("", f"Script not found: {script}"); return
+
+        bin_name = "vaydns-client.exe" if sys.platform == "win32" else "vaydns-client"
+        if not (folder / bin_name).exists():
+            fa_hint = "فایل vaydns-client را در کنار برنامه قرار دهید تا کپی شود"
+            en_hint = "Place vaydns-client binary next to this app to have it copied automatically"
+            messagebox.showerror("", f"{'Binary not found' if not fa else 'فایل اجرایی پیدا نشد'}:\n{folder / bin_name}\n\n{en_hint if not fa else fa_hint}")
+            return
+
+        import subprocess, shlex
+        folder_q  = shlex.quote(str(folder))
+        script_q  = shlex.quote(script.name)
+        try:
+            if sys.platform == "win32":
+                subprocess.Popen(["cmd", "/c", "start", "", str(script)], cwd=str(folder))
+            elif sys.platform == "darwin":
+                as_script = (
+                    'tell application "Terminal"\n'
+                    '    activate\n'
+                    f'    do script "cd {folder_q} && bash {script_q}"\n'
+                    'end tell'
+                )
+                subprocess.Popen(["osascript", "-e", as_script])
+            else:
+                launched = False
+                for term, args in [
+                    ("gnome-terminal", ["--working-directory", str(folder), "--", "bash", str(script)]),
+                    ("xterm",          ["-e", f"cd {folder_q} && bash {script_q}"]),
+                    ("konsole",        ["--workdir", str(folder), "-e", "bash", str(script)]),
+                    ("xfce4-terminal", ["--working-directory", str(folder), "-e", str(script)]),
+                ]:
+                    try:
+                        subprocess.Popen([term] + args); launched = True; break
+                    except FileNotFoundError: continue
+                if not launched:
+                    subprocess.Popen(["bash", str(script)], cwd=str(folder))
+            self._log(f"{'VayDNS راه‌اندازی شد:' if fa else 'VayDNS launched:'} {script}")
+        except Exception as e:
+            messagebox.showerror("", str(e))
+
+    def _vd_profile_duplicate(self):
+        stem = self._vd_sel_profile
+        if not stem: return
+        fa  = self._lang == "fa"
+        src = dict(self._vd_profiles[stem])
+        import copy as _copy, shutil as _sh
+
+        new_name = simpledialog.askstring(
+            "Duplicate" if not fa else "کپی پروفایل",
+            "New profile name:" if not fa else "نام پروفایل جدید:",
+            initialvalue=src.get("name", stem) + (" (copy)" if not fa else " (کپی)"),
+            parent=self)
+        if not new_name or not new_name.strip(): return
+
+        new_profile = _copy.deepcopy(src)
+        new_profile["name"]    = new_name.strip()
+        new_profile["country"] = new_name.strip()
+        new_profile["date"]    = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        src_folder = app_dir() / src.get("country", stem)
+        dst_folder = app_dir() / new_name.strip()
+        if src_folder.exists():
+            try:
+                _sh.copytree(str(src_folder), str(dst_folder))
+            except Exception as e:
+                self._log(f"Folder copy error: {e}")
+        else:
+            try: write_vaydns_launch_script(new_profile)
+            except Exception as e: self._log(f"Script write error: {e}")
+
+        new_stem = save_new_vaydns_profile(new_profile)
+        self._log(f"{'VayDNS پروفایل کپی شد:' if fa else 'VayDNS profile duplicated:'} {new_name}")
+        self._vd_profiles = load_all_vaydns_profiles()
+        self._vd_refresh_profiles_list()
+        if new_stem in self._vd_profiles:
+            self._vd_select_profile(new_stem)
+
+    def _vd_profile_delete(self):
+        stem = self._vd_sel_profile
+        if not stem: return
+        fa   = self._lang == "fa"
+        name = self._vd_profiles[stem].get("name", stem)
+        if not messagebox.askyesno(
+                "Delete" if not fa else "حذف",
+                f"{'حذف پروفایل VayDNS' if fa else 'Delete VayDNS profile'} '{name}'?"): return
+
+        country = delete_vaydns_profile(stem)
+        if country:
+            fp = app_dir() / country
+            if fp.exists() and messagebox.askyesno(
+                    "Delete folder?" if not fa else "حذف پوشه؟",
+                    f"{'پوشه خروجی هم حذف شود؟' if fa else 'Also delete output folder?'}\n{fp}"):
+                import shutil as _sh
+                try: _sh.rmtree(str(fp))
+                except Exception as e: self._log(f"Folder delete error: {e}")
+
+        self._vd_sel_profile = None
+        self._vd_show_detail(False)
+        self._vd_refresh_profiles_list()
+
     # ── LEFT PANEL ──────────────────────────────────────────────
     def _build_left(self, parent):
         W  = self._W
@@ -4505,9 +5143,16 @@ class App(tk.Tk):
 
         self._key_var = entry_field(
             c1, "key_lbl", "key_ent", "key_hint",
-            "Encryption Key",  "کلید رمزنگاری",
+            "MasterDNS Encryption Key",  "کلید رمزنگاری MasterDNS",
             "32-char key from server  (encrypt_key.txt)",
             "کلید ۳۲ کاراکتری از سرور  (فایل encrypt_key.txt)")
+
+        # VayDNS public key — 64 hex chars (Noise protocol)
+        self._vd_pubkey_var = entry_field(
+            c1, "vd_key_lbl", "vd_key_ent", "vd_key_hint",
+            "VayDNS Public Key",  "کلید عمومی VayDNS",
+            "64-char hex pubkey from server  (server.pub)",
+            "کلید عمومی ۶۴ کاراکتری hex از سرور  (server.pub)")
 
         self._country_var = entry_field(
             c1, "country_lbl", "country_ent", "country_hint",
@@ -4585,7 +5230,8 @@ class App(tk.Tk):
 
         mk_btn("btn_scan",    "▶  Start Scan",           "▶  شروع اسکن",           ACCENT,    SCAN_FG, self._start_scan)
         mk_btn("btn_stop",    "■  Stop",                  "■  توقف",                DANGER,    "#000000", self._stop_scan,    "disabled")
-        mk_btn("btn_save",    "💾  Save to MasterDNS Profiles", "💾  ذخیره در پروفایل‌های MasterDNS", BLUE, SAVE_FG, self._save_configs, "disabled")
+        mk_btn("btn_save",    "💾  Save to MasterDNS Profiles", "💾  ذخیره در MasterDNS", BLUE,   SAVE_FG, self._save_configs,       "disabled")
+        mk_btn("btn_vd_save", "💾  Save to VayDNS Profiles",    "💾  ذخیره در VayDNS",    PURPLE, BTN_TEXT, self._save_vaydns_profile, "disabled")
         mk_btn("btn_clear",   "🗑  Clear",                 "🗑  پاک کردن",            BORDER,    CLEAR_FG,self._clear)
 
     # ── RIGHT PANEL ─────────────────────────────────────────────
@@ -4733,7 +5379,9 @@ class App(tk.Tk):
         for wkey, fa_t, en_t in [
             ("btn_scan",    "▶  شروع اسکن",           "▶  Start Scan"),
             ("btn_stop",    "■  توقف",                "■  Stop"),
-            ("btn_save",    "💾  ذخیره در پروفایل‌های MasterDNS", "💾  Save to MasterDNS Profiles"),
+            ("btn_save",    "💾  ذخیره در MasterDNS", "💾  Save to MasterDNS Profiles"),
+            ("btn_vd_save", "💾  ذخیره در VayDNS",    "💾  Save to VayDNS Profiles"),
+            ("vd_key_lbl",  "کلید عمومی VayDNS",      "VayDNS Public Key"),
             ("btn_clear",   "🗑  پاک کردن",            "🗑  Clear"),
         ]:
             W[wkey].config(text=fa_t if fa else en_t,
@@ -4955,6 +5603,7 @@ class App(tk.Tk):
             self._W["btn_scan"].config(state="normal",  bg=ACCENT,  fg="#000000", disabledforeground=DIS_FG)
             if found:
                 self._W["btn_save"].config(state="normal",  bg=BLUE,   fg="#000000", disabledforeground=DIS_FG)
+                self._W["btn_vd_save"].config(state="normal", bg=PURPLE, fg=BTN_TEXT, disabledforeground=DIS_FG)
             self._W["status_lbl"].config(
                 text=f"● {'اتمام' if fa else 'Done'}  —  {found} {'یافت‌شده' if fa else 'found'}",
                 fg=GREEN)
@@ -5010,9 +5659,59 @@ class App(tk.Tk):
         self._W["badge"].config(text=f"0  {'یافت‌شده' if fa else 'found'}")
         self._W["status_lbl"].config(text="● Ready", fg=GREEN)
         self._W["btn_save"].config(state="disabled",    bg="#1a2a4a")
+        self._W["btn_vd_save"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
         self._W["btn_scan"].config(state="normal",       bg=ACCENT)
         self._W["btn_stop"].config(state="disabled",     bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
         self._saved_folder = None
+
+    def _save_vaydns_profile(self):
+        """Save a VayDNS profile from the current scan results."""
+        if not self._found_ips:
+            messagebox.showwarning("", "هیچ Resolver یافت نشد." if self._lang == "fa"
+                                   else "No resolvers found.")
+            return
+        domain  = self._domain_var.get().strip()
+        pubkey  = (self._vd_pubkey_var.get() if self._vd_pubkey_var else "").strip()
+        country = self._country_var.get().strip()
+        fa      = self._lang == "fa"
+
+        if not domain:
+            messagebox.showwarning("", "دامنه تانل را وارد کنید." if fa
+                                   else "Please enter the tunnel domain.")
+            return
+        if not pubkey:
+            messagebox.showwarning("", "کلید عمومی VayDNS را وارد کنید." if fa
+                                   else "Please enter the VayDNS public key.")
+            return
+        if not country:
+            messagebox.showwarning("", "نام پوشه را وارد کنید." if fa
+                                   else "Please enter the folder name.")
+            return
+
+        ts      = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        profile = {
+            "name":           country,
+            "date":           ts,
+            "domain":         domain,
+            "pubkey":         pubkey,
+            "country":        country,
+            "resolver_count": len(self._found_ips),
+            "resolvers":      list(self._found_ips),
+            "options":        dict(VAYDNS_DEFAULTS),
+        }
+        try:
+            script = write_vaydns_launch_script(profile)
+            save_new_vaydns_profile(profile)
+            self._log(f"{'✓ VayDNS پروفایل ذخیره شد — تب VayDNS Profiles را ببینید' if fa else '✓ VayDNS profile saved — see VayDNS Profiles tab'}")
+            messagebox.showinfo(
+                "Saved",
+                f"{'VayDNS پروفایل ذخیره شد:' if fa else 'VayDNS profile saved to:'}"
+                f"\n{script.parent}\n"
+                f"\n• {script.name}  (launch script)"
+                f"\n• vaydns-client\n\n"
+                f"{'برای تغییر تنظیمات به تب VayDNS Profiles بروید' if fa else 'Go to VayDNS Profiles tab to edit options'}.")
+        except Exception as e:
+            messagebox.showerror("", str(e))
 
     def _save_configs_silent(self):
         """Auto-save with defaults immediately after scan — no dialog.

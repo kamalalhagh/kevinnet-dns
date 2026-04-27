@@ -1,0 +1,178 @@
+name: Branch Build (no release)
+
+# Builds any feature/* or dev/* branch push and uploads downloadable
+# artifacts. Does NOT create a release or touch main.
+# Artifacts are available for 7 days under the Actions tab.
+
+on:
+  push:
+    branches:
+      - "feature/**"
+      - "dev/**"
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to build"
+        required: false
+        default: ""
+
+jobs:
+
+  # ── Windows x64 ──────────────────────────────────────────────
+  windows-x64:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          architecture: "x64"
+      - name: Install packages
+        run: python -m pip install dnspython pyinstaller pillow --upgrade --quiet
+      - name: Build EXE
+        run: |
+          $addData = ""
+          if (Test-Path "MasterDnsVPN.exe") { $addData += ' --add-data "MasterDnsVPN.exe;."' }
+          if (Test-Path "MasterDnsVPN")     { $addData += ' --add-data "MasterDnsVPN;."' }
+          $cmd = "python -m PyInstaller --onefile --windowed --name KevinNet_Windows_x64 --clean$addData kevinnet.py"
+          Invoke-Expression $cmd
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Windows-x64
+          path: dist/KevinNet_Windows_x64.exe
+          retention-days: 7
+
+  # ── macOS Apple Silicon ───────────────────────────────────────
+  macos-arm64:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install ARM Python + Tkinter
+        run: |
+          brew install python@3.12 python-tk@3.12
+          /opt/homebrew/opt/python@3.12/bin/python3.12 -m venv .venv
+          .venv/bin/pip install dnspython pyinstaller pillow --upgrade --quiet
+      - name: Build arm64
+        run: |
+          ADD_DATA=""
+          [ -f "MasterDnsVPN" ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN:."
+          .venv/bin/python -m PyInstaller \
+            --onefile --name KevinNet_macOS_arm64 --clean \
+            $ADD_DATA kevinnet.py
+          [ ! -f dist/KevinNet_macOS_arm64 ] && \
+            cp dist/KevinNet_macOS_arm64.app/Contents/MacOS/KevinNet_macOS_arm64 \
+               dist/KevinNet_macOS_arm64 || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macOS-arm64
+          path: dist/KevinNet_macOS_arm64
+          retention-days: 7
+
+  # ── macOS Intel ───────────────────────────────────────────────
+  macos-intel:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Enable Rosetta 2
+        run: softwareupdate --install-rosetta --agree-to-license 2>/dev/null || true
+      - name: Install official Python 3.12 from python.org
+        run: |
+          curl -fsSL https://www.python.org/ftp/python/3.12.9/python-3.12.9-macos11.pkg \
+            -o /tmp/py.pkg
+          sudo installer -pkg /tmp/py.pkg -target /
+          arch -x86_64 /usr/local/bin/python3.12 -m venv .venv_x86
+          arch -x86_64 .venv_x86/bin/pip install dnspython pyinstaller pillow --upgrade --quiet
+      - name: Build x86_64
+        run: |
+          ADD_DATA=""
+          [ -f "MasterDnsVPN" ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN:."
+          arch -x86_64 .venv_x86/bin/python -m PyInstaller \
+            --onefile --name KevinNet_macOS_Intel --clean \
+            $ADD_DATA kevinnet.py
+          [ ! -f dist/KevinNet_macOS_Intel ] && \
+            cp dist/KevinNet_macOS_Intel.app/Contents/MacOS/KevinNet_macOS_Intel \
+               dist/KevinNet_macOS_Intel || true
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macOS-Intel
+          path: dist/KevinNet_macOS_Intel
+          retention-days: 7
+
+  # ── macOS Universal ───────────────────────────────────────────
+  macos-universal:
+    needs: [macos-arm64, macos-intel]
+    runs-on: macos-latest
+    steps:
+      - name: Download arm64
+        uses: actions/download-artifact@v4
+        with:
+          name: macOS-arm64
+          path: bins/
+      - name: Download Intel
+        uses: actions/download-artifact@v4
+        with:
+          name: macOS-Intel
+          path: bins/
+      - name: Combine Universal
+        run: |
+          chmod +x bins/KevinNet_macOS_arm64 bins/KevinNet_macOS_Intel
+          lipo -create bins/KevinNet_macOS_arm64 bins/KevinNet_macOS_Intel \
+            -output bins/KevinNet_macOS_Universal
+          lipo -archs bins/KevinNet_macOS_Universal
+      - uses: actions/upload-artifact@v4
+        with:
+          name: macOS-Universal
+          path: bins/KevinNet_macOS_Universal
+          retention-days: 7
+
+  # ── Linux x64 ────────────────────────────────────────────────
+  linux-x64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install system deps
+        run: sudo apt-get install -y python3-tk
+      - name: Install packages
+        run: python -m pip install dnspython pyinstaller pillow --upgrade --quiet
+      - name: Build binary
+        run: |
+          ADD_DATA=""
+          [ -f "MasterDnsVPN" ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN:."
+          python -m PyInstaller \
+            --onefile --windowed \
+            --name KevinNet_Linux_x64 \
+            --clean $ADD_DATA kevinnet.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Linux-x64
+          path: dist/KevinNet_Linux_x64
+          retention-days: 7
+
+  # ── Linux ARM64 ───────────────────────────────────────────────
+  linux-arm64:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install system deps
+        run: sudo apt-get install -y python3-tk
+      - name: Install packages
+        run: python -m pip install dnspython pyinstaller pillow --upgrade --quiet
+      - name: Build binary
+        run: |
+          ADD_DATA=""
+          [ -f "MasterDnsVPN" ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN:."
+          python -m PyInstaller \
+            --onefile --windowed \
+            --name KevinNet_Linux_ARM64 \
+            --clean $ADD_DATA kevinnet.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Linux-ARM64
+          path: dist/KevinNet_Linux_ARM64
+          retention-days: 7

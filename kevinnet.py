@@ -88,6 +88,30 @@ def get_masterdns_exe() -> Path | None:
 
     return None
 
+
+def bind_mousewheel(widget, canvas):
+    """Bind touchpad/mousewheel scroll on widget to scroll canvas.
+    Works on macOS (delta), Windows (delta/120), Linux (Button-4/5).
+    Call this on every widget inside a scrollable canvas so the
+    entire area responds to the touchpad — not just the scrollbar."""
+    def _scroll(e):
+        if sys.platform == "darwin":
+            canvas.yview_scroll(-1 * int(e.delta), "units")
+        elif sys.platform == "win32":
+            canvas.yview_scroll(-1 * int(e.delta / 120), "units")
+        else:
+            canvas.yview_scroll(-1 if e.num == 4 else 1, "units")
+    widget.bind("<MouseWheel>", _scroll, add="+")
+    widget.bind("<Button-4>",   _scroll, add="+")
+    widget.bind("<Button-5>",   _scroll, add="+")
+
+
+def bind_mousewheel_recursive(widget, canvas):
+    """Recursively bind mousewheel on widget and all its children."""
+    bind_mousewheel(widget, canvas)
+    for child in widget.winfo_children():
+        bind_mousewheel_recursive(child, canvas)
+
 # ═══════════════════════════════════════════════════════════════
 BUILTIN_RESOLVERS = """
 # Google
@@ -3407,108 +3431,203 @@ def FA(size=11, weight="normal"):
 # ═══════════════════════════════════════════════════════════════
 HELP = {
     "fa": ("راهنمای استفاده — KevinNet DNS", [
-        ("۱  دامنه تانل را وارد کنید",
-         "ساب‌دامینی که به سرور MasterDnsVPN شما اشاره دارد.\n"
+        ("KevinNet چیست؟",
+         "KevinNet یک برنامه کاربر-پسند است که تانل DNS را برای شما راه‌اندازی می‌کند.\n"
+         "تانل DNS اینترنت شما را از طریق یک سرور شخصی در خارج از ایران عبور می‌دهد\n"
+         "بدون اینکه فیلترینگ DPI ایران بتواند آن را تشخیص دهد.\n\n"
+         "دو موتور پشتیبانی می‌شود:\n"
+         "• MasterDNS — DNS tunnel با Resolver‌های متعدد، بهترین برای ایران\n"
+         "• VayDNS    — DNS tunnel با DoH/DoT/UDP، رمزنگاری Noise پروتکل"),
+
+        ("پیش‌نیاز: سرور شخصی",
+         "برای استفاده، به یک سرور VPS خارج از ایران نیاز دارید.\n"
+         "سرور باید نصب شده باشد — برای راهنمای نصب README را ببینید.\n\n"
+         "قبل از شروع این‌ها را از سرور آماده کنید:\n"
+         "• دامنه تانل (مثال: v.example.com)\n"
+         "• برای MasterDNS: کلید رمزنگاری ۳۲ کاراکتری (فایل encrypt_key.txt)\n"
+         "• برای VayDNS: کلید عمومی ۶۴ کاراکتری hex (فایل server.pub)"),
+
+        ("۱  نوع VPN را انتخاب کنید",
+         "MasterDNS:  اگر سرور MasterDnsVPN نصب کرده‌اید\n"
+         "VayDNS:     اگر سرور VayDNS نصب کرده‌اید\n\n"
+         "هر نوع فیلدهای خودش را نشان می‌دهد و فقط دکمه ذخیره همان نوع فعال می‌شود."),
+
+        ("۲  نام کشور / پوشه را وارد کنید",
+         "یک نام دلخواه برای این پیکربندی — مثلاً  Iran  یا  Turkey\n"
+         "پوشه‌ای با این نام کنار برنامه ساخته می‌شود که:\n"
+         "• فایل‌های تنظیمات VPN درون آن ذخیره می‌شود\n"
+         "• فایل اجرایی VPN هم در همان پوشه کپی می‌شود\n"
+         "• می‌توانید چندین پروفایل با نام‌های مختلف داشته باشید"),
+
+        ("۳  دامنه تانل را وارد کنید",
+         "ساب‌دامینی که NS آن به سرور شما اشاره دارد.\n"
          "مثال:  v.example.com\n"
-         "این را از تنظیمات سرورتان بگیرید."),
-        ("۲  کلید رمزنگاری را وارد کنید",
-         "کلید ۳۲ کاراکتری که هنگام نصب سرور نمایش داده شد.\n"
-         "در فایل encrypt_key.txt کنار MasterDnsVPN سرور ذخیره شده."),
-        ("۳  نام کشور / پوشه را وارد کنید",
-         "یک نام برای پوشه خروجی — مثلاً  Iran  یا  Turkey\n"
-         "پوشه کنار همین برنامه ساخته می‌شود."),
-        ("۴  تنظیمات اسکن را انتخاب کنید",
+         "این را از تنظیمات سرورتان بگیرید.\n\n"
+         "نکته: نام کوتاه‌تر = فضای بیشتر برای داده در هر پکت DNS"),
+
+        ("۴  کلید را وارد کنید",
+         "MasterDNS:  کلید ۳۲ کاراکتری از فایل encrypt_key.txt روی سرور\n"
+         "VayDNS:     کلید عمومی ۶۴ کاراکتری hex از فایل server.pub روی سرور\n\n"
+         "این کلید باید دقیقاً با سرور مطابقت داشته باشد."),
+
+        ("۵  تنظیمات اسکن را انتخاب کنید",
          "هدف (Target): چند Resolver می‌خواهید — پیشنهاد: 100\n"
-         "همزمانی (Concurrency): بالاتر از 100 نروید در ایران — بهترین: 80\n"
-         "Timeout: شبکه‌های ایران کند هستند — پیشنهاد: 3 ثانیه\n"
-         "پول (Pool ×1000): هر چه بیشتر، Resolver بیشتر پیدا می‌شود\n"
-         "  → کم پیدا شد؟ Pool را از 200 به 300 یا 500 افزایش دهید\n"
-         "  → اسکن را 2-3 بار اجرا کنید — هر بار IP‌های جدیدی تست می‌شود"),
-        ("۵  روی ▶ شروع اسکن کلیک کنید",
-         "مرحله ۱: بررسی سریع زنده بودن (~200 هزار IP)\n"
-         "مرحله ۲: تست عمیق ۶ معیاره — ★6/6 ◆4-5 ▸2-3 ·0-1\n"
-         "مرحله ۳: تأیید واقعی تانل از طریق MasterDnsVPN — فیلتر اصلی"),
-        ("۶  روی 💾 ذخیره در پروفایل‌های MasterDNS کلیک کنید",
-         "پروفایل با تنظیمات پیش‌فرض ذخیره می‌شود و پوشه خروجی ساخته می‌شود.\n"
-         "• client_config.toml  •  client_resolvers.txt  •  MasterDnsVPN\n"
-         "اگر MasterDnsVPN در پوشه نبود، آن را از GitHub دانلود کنید\n"
-         "و کنار این برنامه بگذارید، سپس دوباره ذخیره کنید."),
-        ("۷  به تب 📋 پروفایل‌های MasterDNS بروید",
-         "پروفایل ذخیره‌شده را انتخاب کنید.\n"
-         "روی 🚀 اتصال کلیک کنید — VPN با فایل‌های همان پروفایل راه‌اندازی می‌شود.\n"
-         "یا ابتدا تنظیمات مانند MTU را تغییر دهید و ذخیره کنید، سپس اتصال بزنید."),
-        ("📋  تب پروفایل‌ها — ویرایش بدون اسکن مجدد",
-         "هر اسکن ذخیره‌شده یک پروفایل می‌سازد. در تب پروفایل‌ها:\n"
-         "• پروفایل‌های قبلی را باز کنید و تنظیمات را تغییر دهید\n"
-         "• ذخیره کنید تا client_config.toml فوری بازنویسی شود\n"
-         "• مستقیم از پروفایل VPN را راه‌اندازی کنید\n"
-         "• پروفایل‌های قدیمی را حذف کنید"),
-        ("🔧  مقادیر بهینه برای ایران (در پروفایل‌ها)",
-         "روش رمزنگاری:    1 — XOR          کمترین سربار در DNS\n"
-         "استراتژی بالانس: 3 — Least Loss   افت پکت بالای ایران\n"
+         "همزمانی: بالاتر از 100 نروید در ایران — بهترین: 80\n"
+         "Timeout: شبکه‌های ایران کند — پیشنهاد: 3 ثانیه\n"
+         "پول: هر چه بیشتر، Resolver بیشتر — پیشنهاد: 200 (یعنی ۲۰۰ هزار IP)\n\n"
+         "→ کم پیدا شد؟ Pool را به 300 یا 500 افزایش دهید\n"
+         "→ اسکن را 2-3 بار تکرار کنید — هر بار IP‌های مختلفی تست می‌شود"),
+
+        ("۶  روی ▶ شروع اسکن کلیک کنید",
+         "مرحله ۱ (سریع): بررسی زنده بودن همه IP‌های پول\n"
+         "مرحله ۲ (دقیق): تست ۶ معیاره — ★6/6 ◆4-5 ▸2-3 ·0-1\n"
+         "مرحله ۳ (واقعی): تأیید E2E از طریق باینری VPN\n\n"
+         "نتایج رنگی معنایشان است: سبز = عالی، زرد = خوب، نارنجی = ضعیف"),
+
+        ("۷  ذخیره در پروفایل‌ها",
+         "MasterDNS: روی '💾 ذخیره در MasterDNS' کلیک کنید\n"
+         "VayDNS:    روی '💾 ذخیره در VayDNS' کلیک کنید\n\n"
+         "پروفایل با تنظیمات پیش‌فرض ذخیره می‌شود. برای تغییر تنظیمات:\n"
+         "→ تب مربوطه را باز کنید → پروفایل را انتخاب کنید → ویرایش کنید"),
+
+        ("۸  اتصال از تب پروفایل‌ها",
+         "به تب MasterDNS Profiles یا VayDNS Profiles بروید.\n"
+         "پروفایل ذخیره‌شده را از لیست انتخاب کنید.\n"
+         "روی 🚀 اتصال کلیک کنید — ترمینال باز می‌شود و VPN شروع به کار می‌کند.\n\n"
+         "می‌توانید قبل از اتصال تنظیمات را تغییر داده و ذخیره کنید.\n"
+         "با 📋 کپی می‌توانید از یک پروفایل چند نسخه با تنظیمات متفاوت داشته باشید."),
+
+        ("🔧  مقادیر بهینه MasterDNS برای ایران",
+         "روش رمزنگاری:    1 — XOR          کمترین سربار در پکت‌های DNS\n"
+         "استراتژی بالانس: 3 — Least Loss   ایران افت پکت بالا دارد\n"
          "تکرار بسته:      2 یا 3           افزونگی در شبکه پر افت\n"
-         "Max Upload MTU:  80–100           query کوچک‌تر = کمتر DPI\n"
-         "Max Download MTU: 700            جلوگیری از fragmentation\n"
-         "Min Upload MTU:  38              بیشترین تعداد Resolver\n"
-         "Min Download MTU: 400           Resolverهای مرزی را نگه دار\n"
-         "Log Level:       INFO            عملکرد عادی"),
+         "Max Upload MTU:  80–100           query کوچک‌تر = کمتر DPI trigger\n"
+         "Max Download MTU: 700            جلوگیری از fragmentation ISP\n"
+         "Min Upload MTU:  38              بیشترین تعداد Resolver در pool\n"
+         "Min Download MTU: 400           Resolverهای مرزی را نگه می‌دارد"),
+
+        ("🔧  مقادیر بهینه VayDNS برای ایران",
+         "Transport:       UDP             مستقیم‌ترین حالت از ایران\n"
+         "Resolver:        خالی            همه Resolverهای اسکن‌شده امتحان می‌شوند\n"
+         "Max QNAME Len:   101             ایمن برای اکثر Resolverها\n"
+         "Idle Timeout:    10s             اگر قطعی مکرر دارید: 30s\n"
+         "Record Type:     txt             بیشترین سازگاری با DPI\n"
+         "UDP Workers:     100             اگر خطای socket داشتید: 50\n"
+         "Resolver Timeout: 60s           اگر بعد از ۶۰ ثانیه وصل نشد به Resolver بعدی می‌رود"),
+
+        ("تست دوباره و مقایسه",
+         "اگر اتصال خوب نبود این مراحل را امتحان کنید:\n"
+         "۱. در تب پروفایل، پروفایل را کپی کنید (📋 Duplicate)\n"
+         "۲. در نسخه کپی، یک تنظیم را تغییر دهید (مثلاً MTU)\n"
+         "۳. هر دو را ذخیره کنید و هر کدام را تست کنید\n"
+         "۴. نسخه بهتر را نگه دارید، بقیه را حذف کنید\n\n"
+         "برای MasterDNS می‌توانید اسکن را تکرار کنید — هر بار Resolverهای جدید"),
+
         ("مک — مشکل 'damaged' یا 'cannot be verified'",
          "در ترمینال این دو دستور را بزنید:\n"
          "chmod +x KevinNet_macOS_Universal\n"
          "xattr -d com.apple.quarantine KevinNet_macOS_Universal"),
     ]),
     "en": ("How to use — KevinNet DNS", [
-        ("1  Enter your tunnel domain",
-         "The subdomain pointing to your MasterDnsVPN server.\n"
+        ("What is KevinNet?",
+         "KevinNet is a user-friendly app that sets up a DNS tunnel for you.\n"
+         "A DNS tunnel routes your internet through a personal server outside Iran\n"
+         "without Iran's DPI filtering being able to detect or block it.\n\n"
+         "Two engines are supported:\n"
+         "• MasterDNS — DNS tunnel with multiple resolvers, best for Iran\n"
+         "• VayDNS    — DNS tunnel with DoH/DoT/UDP, Noise protocol encryption"),
+
+        ("Prerequisite: a personal server",
+         "You need a VPS server outside Iran, with the VPN server software installed.\n"
+         "See the README for server installation guides.\n\n"
+         "Have these ready from your server before starting:\n"
+         "• Tunnel domain  (e.g. v.example.com)\n"
+         "• MasterDNS: 32-char encryption key  (encrypt_key.txt)\n"
+         "• VayDNS:    64-char hex public key  (server.pub)"),
+
+        ("1  Choose VPN type",
+         "MasterDNS:  if you installed MasterDnsVPN on your server\n"
+         "VayDNS:     if you installed VayDNS on your server\n\n"
+         "Each type shows its own fields. Only the matching save button is active."),
+
+        ("2  Enter country / folder name",
+         "Any name for this configuration — e.g.  Iran  or  Turkey\n"
+         "A folder with this name is created next to the app, containing:\n"
+         "• The VPN config files\n"
+         "• A copy of the VPN binary\n"
+         "You can have multiple profiles with different names."),
+
+        ("3  Enter your tunnel domain",
+         "The subdomain whose NS record points to your server.\n"
          "e.g.  v.example.com\n"
-         "Get this from your server configuration."),
-        ("2  Enter your encryption key",
-         "The 32-character key shown when you installed the server.\n"
-         "Also saved in encrypt_key.txt next to MasterDnsVPN on the server."),
-        ("3  Enter country / folder name",
-         "A name for the output folder — e.g.  Iran  or  Turkey\n"
-         "The folder is created next to this app."),
-        ("4  Choose scan settings",
+         "Get this from your server setup.\n\n"
+         "Tip: shorter names leave more room for data inside each DNS packet."),
+
+        ("4  Enter your key",
+         "MasterDNS:  32-char key from encrypt_key.txt on the server\n"
+         "VayDNS:     64-char hex public key from server.pub on the server\n\n"
+         "This must match the server exactly."),
+
+        ("5  Choose scan settings",
          "Target: how many resolvers to find — recommended: 100\n"
          "Concurrency: do not go above 100 inside Iran — best: 80\n"
          "Timeout: Iranian networks are slow — recommended: 3s\n"
-         "Pool ×1000: more = more resolvers found\n"
-         "  → Finding very few? Increase Pool from 200 to 300 or 500\n"
-         "  → Run scan 2-3 times — each run tests different IPs"),
-        ("5  Click ▶ Start Scan",
-         "Phase 1: Quick alive check (~200k IPs)\n"
-         "Phase 2: Full 6-check scoring — ★6/6 ◆4-5 ▸2-3 ·0-1\n"
-         "Phase 3: Real tunnel E2E via MasterDnsVPN — the true filter"),
-        ("6  Click 💾 Save to MasterDNS Profiles",
-         "Saves the profile with default options and writes the output folder:\n"
-         "• client_config.toml  •  client_resolvers.txt  •  MasterDnsVPN\n"
-         "If MasterDnsVPN is missing, download it from GitHub\n"
-         "and place it next to this app, then save again."),
-        ("7  Go to the 📋 MasterDNS Profiles tab",
-         "Select the saved profile.\n"
-         "Click 🚀 Launch VPN — starts the VPN with that profile's files.\n"
-         "Or edit options like MTU first, save, then launch."),
-        ("📋  Profiles Tab — edit options without re-scanning",
-         "Every saved scan creates a profile. In the Profiles tab:\n"
-         "• Re-open any previous scan and change its settings\n"
-         "• Save changes — instantly rewrites client_config.toml\n"
-         "• Launch VPN directly from any profile\n"
-         "• Delete old profiles cleanly"),
-        ("🔧  Iran-optimised values (Profile options)",
-         "Encryption Method:   1 — XOR          lowest overhead in DNS\n"
-         "Balancing Strategy:  3 — Least Loss    high packet loss in Iran\n"
-         "Packet Duplication:  2 or 3            redundancy on lossy paths\n"
-         "Max Upload MTU:      80–100            smaller = less DPI trigger\n"
-         "Max Download MTU:    700               avoids ISP fragmentation\n"
-         "Min Upload MTU:      38                keeps max resolver pool\n"
-         "Min Download MTU:    400               keeps marginal resolvers\n"
-         "Log Level:           INFO              normal use"),
+         "Pool ×1000: more IPs scanned = more resolvers found — try: 200\n\n"
+         "→ Finding very few? Increase Pool to 300 or 500\n"
+         "→ Run 2-3 times — each run tests different IPs"),
+
+        ("6  Click ▶ Start Scan",
+         "Phase 1 (fast): alive check on all IPs in the pool\n"
+         "Phase 2 (deep): 6-check scoring — ★6/6 ◆4-5 ▸2-3 ·0-1\n"
+         "Phase 3 (real): E2E tunnel test via the VPN binary\n\n"
+         "Green = excellent, Yellow = good, Orange = weak"),
+
+        ("7  Save to Profiles",
+         "MasterDNS: click '💾 Save to MasterDNS Profiles'\n"
+         "VayDNS:    click '💾 Save to VayDNS Profiles'\n\n"
+         "Saved with default settings. To change settings:\n"
+         "→ Open the relevant tab → select the profile → edit"),
+
+        ("8  Connect from the Profiles tab",
+         "Go to the MasterDNS Profiles or VayDNS Profiles tab.\n"
+         "Select your saved profile from the list.\n"
+         "Click 🚀 Launch VPN — a terminal opens and the VPN starts.\n\n"
+         "You can edit settings before launching and save the changes.\n"
+         "Use 📋 Duplicate to make copies with different settings for A/B testing."),
+
+        ("🔧  MasterDNS optimal values for Iran",
+         "Encryption Method:    1 — XOR          lowest overhead in DNS packets\n"
+         "Balancing Strategy:   3 — Least Loss    Iran has high packet loss\n"
+         "Packet Duplication:   2 or 3            redundancy on lossy paths\n"
+         "Max Upload MTU:       80–100            smaller queries = less DPI trigger\n"
+         "Max Download MTU:     700               avoids ISP fragmentation\n"
+         "Min Upload MTU:       38                keeps maximum resolver pool\n"
+         "Min Download MTU:     400               keeps marginal resolvers"),
+
+        ("🔧  VayDNS optimal values for Iran",
+         "Transport:       UDP             most direct path from Iran\n"
+         "Resolver:        (empty)         tries all scanned resolvers in order\n"
+         "Max QNAME Len:   101             safe for most resolvers\n"
+         "Idle Timeout:    10s             increase to 30s if you see reconnects\n"
+         "Record Type:     txt             most compatible under DPI\n"
+         "UDP Workers:     100             lower to 50 if you see socket errors\n"
+         "Resolver Timeout: 60s           moves to next resolver if stuck for 60s"),
+
+        ("Testing and comparing settings",
+         "If the connection is unstable, try these steps:\n"
+         "1. In the Profiles tab, duplicate the profile (📋 Duplicate)\n"
+         "2. In the copy, change one setting (e.g. Max Upload MTU)\n"
+         "3. Save both and test each one\n"
+         "4. Keep the better one, delete the rest\n\n"
+         "For MasterDNS, repeat the scan to get fresh resolvers — each run finds different IPs."),
+
         ("macOS — 'damaged' or 'cannot be verified' error",
          "Run these two commands in Terminal:\n"
          "chmod +x KevinNet_macOS_Universal\n"
          "xattr -d com.apple.quarantine KevinNet_macOS_Universal"),
     ]),
 }
+
 
 def show_help(parent, lang):
     title, steps = HELP[lang]
@@ -3557,6 +3676,12 @@ def show_help(parent, lang):
 
     inner = tk.Frame(body, bg=PANEL)
     inner.pack(fill="x", padx=24, pady=10)
+
+    # Bind touchpad scroll on every widget inside the canvas
+    inner.bind("<Configure>", lambda e: (
+        canvas.configure(scrollregion=canvas.bbox("all")),
+        bind_mousewheel_recursive(inner, canvas)
+    ), add="+")
 
     for step_title, step_body in steps:
         row = tk.Frame(inner, bg=CARD,
@@ -4400,6 +4525,8 @@ class App(tk.Tk):
         left.bind("<MouseWheel>",        _on_mousewheel)
 
         self._build_left(left)
+        # After left panel is built, bind scroll on all child widgets
+        left.bind("<Configure>", lambda e: bind_mousewheel_recursive(left, left_canvas), add="+")
 
         right = tk.Frame(body, bg=BG)
         right.pack(side="left", fill="both", expand=True,
@@ -4488,6 +4615,7 @@ class App(tk.Tk):
         def _lrsz(e): list_canvas.itemconfig(self._plist_win, width=e.width)
         self._plist_inner.bind("<Configure>", _lcfg)
         list_canvas.bind("<Configure>", _lrsz)
+        self._plist_inner.bind("<Map>", lambda e: bind_mousewheel_recursive(self._plist_inner, list_canvas), add="+")
         W["plist_canvas"] = list_canvas
 
         # Right: detail
@@ -4513,6 +4641,7 @@ class App(tk.Tk):
         def _drsz(e): det_canvas.itemconfig(det_win, width=e.width)
         detail.bind("<Configure>", _dcfg)
         det_canvas.bind("<Configure>", _drsz)
+        detail.bind("<Map>", lambda e: bind_mousewheel_recursive(detail, det_canvas), add="+")
 
         W["pdetail_scroll"]    = det_canvas
         W["pdetail_frame"]     = detail
@@ -4933,6 +5062,7 @@ class App(tk.Tk):
         self._vd_plist_win   = lc.create_window((0,0), window=self._vd_plist_inner, anchor="nw")
         self._vd_plist_inner.bind("<Configure>", lambda e: lc.configure(scrollregion=lc.bbox("all")))
         lc.bind("<Configure>", lambda e: lc.itemconfig(self._vd_plist_win, width=e.width))
+        self._vd_plist_inner.bind("<Map>", lambda e: bind_mousewheel_recursive(self._vd_plist_inner, lc), add="+")
         W["vd_plist_canvas"] = lc
 
         # ── Right: detail ─────────────────────────────────────────
@@ -4955,6 +5085,7 @@ class App(tk.Tk):
         det_win = dc.create_window((0,0), window=detail, anchor="nw")
         detail.bind("<Configure>", lambda e: dc.configure(scrollregion=dc.bbox("all")))
         dc.bind("<Configure>", lambda e: dc.itemconfig(det_win, width=e.width))
+        detail.bind("<Map>", lambda e: bind_mousewheel_recursive(detail, dc), add="+")
 
         W["vd_pdetail_scroll"]    = dc
         W["vd_pdetail_frame"]     = detail
@@ -5033,8 +5164,19 @@ class App(tk.Tk):
         # ── Transport ──
         opt_row("transport",        "Transport",                    "نوع انتقال",
                 combo_b(VAYDNS_TRANSPORT_LABELS, VAYDNS_TRANSPORT_LABELS[0]))
-        opt_row("custom_resolver",  "Resolver  (IP, URL or host:port)", "Resolver",
+        opt_row("custom_resolver",
+                "Resolver  (leave empty = use all scanned IPs)",
+                "Resolver  (خالی = همه IP‌های اسکن‌شده)",
                 entry_b("", width=30))
+        # Hint label for the resolver field
+        hint_row = tk.Frame(opt, bg=CARD)
+        hint_row.pack(fill="x", pady=(0, 4))
+        tk.Label(hint_row,
+                 text="↑ خالی = همه IP‌ها  |  IP وارد کنید = فقط آن یک Resolver  |  DoH: URL کامل  |  DoT: host:853" if fa else "↑ Empty = try all scanned IPs in order  |  Enter IP = use only that one  |  DoH: full URL  |  DoT: host:853",
+                 bg=CARD, fg=MUTED,
+                 font=FA(8) if fa else F(8),
+                 anchor="w", justify="left",
+                 padx=4, wraplength=340).pack(fill="x")
 
         # ── Local ──
         opt_row("listen_port",      "Listen Port",                  "پورت محلی",

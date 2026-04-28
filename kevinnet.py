@@ -3375,15 +3375,15 @@ def run_e2e_verify(found_ips: list, domain: str, timeout_s: float,
 # ═══════════════════════════════════════════════════════════════
 
 # ═══════════════════════════════════════════════════════════════
-#  WINDOWS BIDI FIX — Persian/Arabic text rendering
+#  BIDI FIX — Persian/Arabic text rendering
 # ═══════════════════════════════════════════════════════════════
-# On Windows, Tkinter's GDI renderer does not auto-reorder RTL text
-# for LTR-locale systems. Persian words appear fully reversed (e.g.
-# "اسکنر" shows as "رنکسا"). Fix: prepend U+200F (RIGHT-TO-LEFT MARK)
-# to any string containing Persian/Arabic characters before it reaches
-# a Tkinter widget. Monkey-patching Label/Button/etc. catches every
-# string automatically. macOS and Linux have native BiDi — no effect there.
-if sys.platform == "win32":
+# Tkinter on Windows AND Linux (without a proper Arabic-capable font stack)
+# does not auto-reorder RTL text. Persian words appear fully reversed.
+# Fix: prepend U+200F (RIGHT-TO-LEFT MARK) to any string containing
+# Persian/Arabic characters. Monkey-patching Label/Button etc. catches
+# every string automatically. macOS has native CoreText BiDi — excluded.
+_needs_bidi_fix = sys.platform in ("win32", "linux")
+if _needs_bidi_fix:
     _RLM = "\u200f"   # RIGHT-TO-LEFT MARK
 
     def _bidi(s):

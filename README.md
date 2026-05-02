@@ -6,9 +6,9 @@
 
 # 🌐 KevinNet DNS
 
-**A user-friendly GUI client for DNS tunneling — supports MasterDnsVPN and VayDNS**
+**A user-friendly GUI client for DNS tunneling  supports MasterDnsVPN and VayDNS**
 
-> KevinNet automatically scans Iranian IP ranges to find working DNS resolvers, then generates ready-to-use config files and launch scripts — with a single click to connect. No config files to edit. No terminal commands to remember.
+> KevinNet automatically scans Iranian IP ranges to find working DNS resolvers, then generates ready-to-use config files and launch scripts  with a single click to connect. No config files to edit. No terminal commands to remember.
 
 **Created by Kevin Haji · [kevinhaji.com](https://kevinhaji.com) · [kevin.fullstack.dev@gmail.com](mailto:kevin.fullstack.dev@gmail.com)**
 
@@ -16,12 +16,12 @@
 
 ## 💡 What is KevinNet?
 
-A DNS tunnel disguises your internet traffic as ordinary DNS queries. Iran's DPI filtering cannot easily identify or block it. KevinNet handles all the technical parts — scanning for working resolvers, writing config files, copying binaries, launching the VPN — so you only need to fill in a few fields and click buttons.
+A DNS tunnel disguises your internet traffic as ordinary DNS queries. Iran's DPI filtering cannot easily identify or block it. KevinNet handles all the technical parts  scanning for working resolvers, writing config files, copying binaries, launching the VPN  so you only need to fill in a few fields and click buttons.
 
 Two VPN engines are supported:
 
-- **MasterDNS** — uses multiple resolvers simultaneously for high reliability. Best choice for Iran.
-- **VayDNS** — uses Noise protocol encryption with DoH, DoT, or UDP transport. Falls through resolvers automatically.
+- **MasterDNS**  uses multiple resolvers simultaneously for high reliability. Best choice for Iran.
+- **VayDNS**  uses Noise protocol encryption with DoH, DoT, or UDP transport. Falls through resolvers automatically.
 
 ---
 
@@ -54,17 +54,17 @@ KevinNet is the **client app**. It connects to a VPN server that you (or someone
 
 ### If you are using MasterDNS
 
-#### 1 — A VPS server outside Iran
+#### 1  A VPS server outside Iran
 
 Any Linux VPS with a public IP address. Popular providers: Hetzner, DigitalOcean, Vultr, Linode.
 
-#### 2 — A domain name with NS delegation
+#### 2  A domain name with NS delegation
 
 MasterDNS acts as an authoritative DNS server, so DNS queries for your tunnel subdomain must be forwarded to your VPS. Create **two DNS records** in your domain provider's control panel:
 
 | Type | Name | Value | Purpose |
 |---|---|---|---|
-| `A` | `ns` | Your server's IP | Glue record — where your nameserver lives |
+| `A` | `ns` | Your server's IP | Glue record  where your nameserver lives |
 | `NS` | `v` | `ns.yourdomain.com` | Delegates `v.yourdomain.com` queries to your server |
 
 Example with domain `example.com` and server IP `1.2.3.4`:
@@ -76,51 +76,51 @@ Your tunnel domain is `v.example.com`.
 > **Cloudflare users:** The `A` record for `ns` must be **DNS only** (grey cloud), not proxied.
 > **Tip:** Short names (1–2 chars) leave more room for data per DNS packet → better speed.
 
-#### 3 — MasterDnsVPN server installed
+#### 3  MasterDnsVPN server installed
 
 Follow the official guide: 👉 [https://github.com/masterking32/MasterDnsVPN](https://github.com/masterking32/MasterDnsVPN)
 
 After setup you will have:
-- **Tunnel Domain** — e.g. `v.example.com` → enter this in KevinNet
-- **32-character Encryption Key** — saved in `encrypt_key.txt` on the server → enter this in KevinNet
+- **Tunnel Domain**  e.g. `v.example.com` → enter this in KevinNet
+- **32-character Encryption Key**  saved in `encrypt_key.txt` on the server → enter this in KevinNet
 
 > The key must match between client and server. If you lose it, run `cat encrypt_key.txt` on your server.
 
-#### 4 — The MasterDnsVPN client binary
+#### 4  The MasterDnsVPN client binary
 
-Bundled inside KevinNet — copied to your output folder automatically when you save. If missing, see [⚠️ Binary missing?](#-binary-missing) below.
+Bundled inside KevinNet  copied to your output folder automatically when you save. If missing, see [⚠️ Binary missing?](#-binary-missing) below.
 
 ---
 
 ### If you are using VayDNS
 
-#### 1 — A VPS server outside Iran
+#### 1  A VPS server outside Iran
 
-Same as MasterDNS — any Linux VPS with a public IP.
+Same as MasterDNS  any Linux VPS with a public IP.
 
-#### 2 — A domain name with NS delegation
+#### 2  A domain name with NS delegation
 
 VayDNS also acts as an authoritative DNS server. The DNS setup concept is identical to MasterDNS: one `A` glue record + one `NS` delegation record.
 
 Example with domain `example.com` and server IP `1.2.3.4`:
-- `tns.example.com` → `1.2.3.4` (A record — glue)
-- `t.example.com` → `tns.example.com` (NS record — delegation)
+- `tns.example.com` → `1.2.3.4` (A record  glue)
+- `t.example.com` → `tns.example.com` (NS record  delegation)
 
 Your tunnel domain is `t.example.com`.
 
-> **Important:** The glue record name (`tns`) must NOT be a subdomain of the tunnel name (`t`). They must be separate — e.g. `tns` and `t`, not `ns.t`.
+> **Important:** The glue record name (`tns`) must NOT be a subdomain of the tunnel name (`t`). They must be separate  e.g. `tns` and `t`, not `ns.t`.
 
-#### 3 — VayDNS server installed
+#### 3  VayDNS server installed
 
 Follow the official guide: 👉 [https://github.com/net2share/vaydns](https://github.com/net2share/vaydns)
 
 After setup you will have:
-- **Tunnel Domain** — e.g. `t.example.com` → enter this in KevinNet
-- **`server.pub` file** on the server — contains your public key
+- **Tunnel Domain**  e.g. `t.example.com` → enter this in KevinNet
+- **`server.pub` file** on the server  contains your public key
 
-#### 4 — Your VayDNS Public Key (64-character hex string)
+#### 4  Your VayDNS Public Key (64-character hex string)
 
-The public key authenticates your server — it proves to the client that it is talking to the right server and not an interceptor. To get it, run on your server:
+The public key authenticates your server  it proves to the client that it is talking to the right server and not an interceptor. To get it, run on your server:
 
 ```bash
 cat server.pub
@@ -133,29 +133,29 @@ You will see a 64-character hex string like:
 
 Copy this entire string and paste it into the **VayDNS Public Key** field in KevinNet.
 
-> The public key is safe to share — it only verifies your server's identity. The private key (`server.key`) must stay on the server and never be shared.
+> The public key is safe to share  it only verifies your server's identity. The private key (`server.key`) must stay on the server and never be shared.
 
-#### 5 — The vaydns-client binary
+#### 5  The vaydns-client binary
 
-Bundled inside KevinNet — copied to your output folder automatically when you save. If missing, see [⚠️ Binary missing?](#-binary-missing) below.
+Bundled inside KevinNet  copied to your output folder automatically when you save. If missing, see [⚠️ Binary missing?](#-binary-missing) below.
 
 ---
 
-## 🚀 How to Use — Step by Step
+## 🚀 How to Use  Step by Step
 
-### Step 1 — Choose VPN type
+### Step 1  Choose VPN type
 
 At the top of the Scanner panel, click **MasterDNS** or **VayDNS**. Only the fields and save button for your chosen type will show.
 
-### Step 2 — Fill in your details
+### Step 2  Fill in your details
 
 | Field | MasterDNS | VayDNS |
 |---|---|---|
-| **Country / Folder** | Any name — e.g. `Iran` | Any name — e.g. `Iran` |
+| **Country / Folder** | Any name  e.g. `Iran` | Any name  e.g. `Iran` |
 | **Tunnel Domain** | e.g. `v.example.com` | e.g. `t.example.com` |
 | **Key** | 32-char key from `encrypt_key.txt` | 64-char hex key from `server.pub` |
 
-### Step 3 — Set scan options
+### Step 3  Set scan options
 
 | Option | Recommended for Iran | Notes |
 |---|---|---|
@@ -164,38 +164,38 @@ At the top of the Scanner panel, click **MasterDNS** or **VayDNS**. Only the fie
 | **Timeout** | `3s` | Iranian networks are slow |
 | **Pool ×1000** | `200` | 200k IPs scanned. Increase to 300–500 if few found |
 
-Run the scan 2–3 times — each run tests a different random set of IPs.
+Run the scan 2–3 times  each run tests a different random set of IPs.
 
-### Step 4 — Start the scan
+### Step 4  Start the scan
 
 Click **▶ Start Scan**. Three automatic phases:
 
-- **Phase 1** — Quick alive check across all IPs in the pool
-- **Phase 2** — Full 6-check scoring: NS→A, TXT, RND, DPI, EDNS, NXD
-- **Phase 3** — Real E2E tunnel test through the VPN binary
+- **Phase 1**  Quick alive check across all IPs in the pool
+- **Phase 2**  Full 6-check scoring: NS→A, TXT, RND, DPI, EDNS, NXD
+- **Phase 3**  Real E2E tunnel test through the VPN binary
 
 🟢 ★6/6 excellent · 🟡 ◆4–5 good · 🟠 ▸2–3 weak · ⚫ ·0–1 very weak
 
-### Step 5 — Save to Profiles
+### Step 5  Save to Profiles
 
 - **MasterDNS:** click **💾 Save to MasterDNS Profiles**
 - **VayDNS:** click **💾 Save to VayDNS Profiles**
 
 A profile is saved with sensible defaults. The VPN binary is copied into the output folder automatically.
 
-### Step 6 — Connect from the Profiles tab
+### Step 6  Connect from the Profiles tab
 
 Click **📋 MasterDNS Profiles** or **📋 VayDNS Profiles** at the top.
 
 1. Select your profile from the left list
 2. Optionally edit options and click **💾 Save Changes**
-3. Click **🚀 Launch VPN** — a terminal opens and the VPN starts
+3. Click **🚀 Launch VPN**  a terminal opens and the VPN starts
 
 Set your browser proxy to `SOCKS5 127.0.0.1:18000` (MasterDNS) or `SOCKS5 127.0.0.1:7000` (VayDNS).
 
 ---
 
-## 📋 Profiles Tab — Saving, Editing & Re-testing
+## 📋 Profiles Tab  Saving, Editing & Re-testing
 
 Every save creates a profile in `masterdns_profiles/` or `vaydns_profiles/` next to the app.
 
@@ -203,47 +203,47 @@ Every save creates a profile in `masterdns_profiles/` or `vaydns_profiles/` next
 |---|---|
 | 💾 Save Changes | Rewrites config files with your current settings |
 | 🚀 Launch VPN | Regenerates files and launches the VPN |
-| 📋 Duplicate | Copies the profile — great for A/B testing different settings |
+| 📋 Duplicate | Copies the profile  great for A/B testing different settings |
 | 🗑 Delete | Removes the profile and optionally the output folder |
 
 ---
 
-## 🔧 MasterDNS Options — What They Mean & Iran Optimal Values
+## 🔧 MasterDNS Options  What They Mean & Iran Optimal Values
 
 | Option | Iran optimal | Why |
 |---|---|---|
-| **Encryption Method** | `1 — XOR` | Lowest overhead in small DNS packets. Must match server. |
-| **Balancing Strategy** | `3 — Least Loss` | Iran has high uneven packet loss — favours the most reliable resolver |
-| **Packet Duplication** | `2–3` | Sends each packet via multiple resolvers — redundancy on lossy paths |
+| **Encryption Method** | `1  XOR` | Lowest overhead in small DNS packets. Must match server. |
+| **Balancing Strategy** | `3  Least Loss` | Iran has high uneven packet loss  favours the most reliable resolver |
+| **Packet Duplication** | `2–3` | Sends each packet via multiple resolvers  redundancy on lossy paths |
 | **Max Upload MTU** | `80–100` | Smaller DNS queries look less suspicious to DPI |
 | **Max Download MTU** | `700` | Prevents ISP from fragmenting large DNS responses |
-| **Min Upload MTU** | `38` | Very conservative — keeps the maximum number of resolvers usable |
+| **Min Upload MTU** | `38` | Very conservative  keeps the maximum number of resolvers usable |
 | **Min Download MTU** | `400` | Keeps resolvers that return slightly smaller responses |
 | **Log Level** | `INFO` | Shows connection events without flooding the terminal |
 
 ---
 
-## 🔧 VayDNS Options — What They Mean & Iran Optimal Values
+## 🔧 VayDNS Options  What They Mean & Iran Optimal Values
 
 | Option | Iran optimal | Why |
 |---|---|---|
-| **Transport** | `UDP` | Plaintext UDP on port 53 — most direct path from Iran |
-| **Resolver** | *(empty)* | Uses all scanned resolvers in order — see note below |
+| **Transport** | `UDP` | Plaintext UDP on port 53  most direct path from Iran |
+| **Resolver** | *(empty)* | Uses all scanned resolvers in order  see note below |
 | **Listen Port** | `7000` | The local port your browser proxy connects to |
 | **Max QNAME Length** | `101` | ~50 byte upstream MTU, safe for most Iranian resolvers |
 | **Idle Timeout** | `10s` | How long before declaring a session dead. Must match server. Increase to `30s` if reconnects are frequent. |
 | **Keepalive** | `2s` | How often to ping the server to keep the session alive. Must be less than idle timeout. Must match server. |
 | **Record Type** | `txt` | TXT records carry the most data and are most compatible under DPI |
-| **Queue Size** | `512` | Internal packet buffer — increase to `1024` on fast connections |
-| **UDP Workers** | `100` | Concurrent outgoing queries — lower to `50` if you see socket errors |
+| **Queue Size** | `512` | Internal packet buffer  increase to `1024` on fast connections |
+| **UDP Workers** | `100` | Concurrent outgoing queries  lower to `50` if you see socket errors |
 | **Resolver Timeout** | `60s` | If a resolver doesn't connect within this many seconds, the script moves to the next one |
 | **Log Level** | `info` | Normal operation |
 
 **The Resolver field:**
-- **Empty (recommended)** — KevinNet generates a launch script that tries all scanned resolvers in order. If one gets stuck, it moves to the next after `Resolver Timeout` seconds.
-- **Single address** — Only that resolver is used. Format: `8.8.8.8:53` for UDP · `https://dns.google/dns-query` for DoH · `dns.google:853` for DoT.
+- **Empty (recommended)**  KevinNet generates a launch script that tries all scanned resolvers in order. If one gets stuck, it moves to the next after `Resolver Timeout` seconds.
+- **Single address**  Only that resolver is used. Format: `8.8.8.8:53` for UDP · `https://dns.google/dns-query` for DoH · `dns.google:853` for DoT.
 
-> **Testing from outside Iran:** Scanned resolvers are Iranian public DNS servers. They only work correctly when connecting **from inside Iran**. Testing from Australia, Europe, or anywhere else will show NXDOMAIN errors — those resolvers cannot reach your tunnel server from a foreign network.
+> **Testing from outside Iran:** Scanned resolvers are Iranian public DNS servers. They only work correctly when connecting **from inside Iran**. Testing from Australia, Europe, or anywhere else will show NXDOMAIN errors  those resolvers cannot reach your tunnel server from a foreign network.
 
 ---
 
@@ -262,7 +262,7 @@ Download the client binary from the [MasterDnsVPN releases](https://github.com/m
 1. Extract the ZIP
 2. Rename the binary to `MasterDnsVPN` (macOS/Linux) or `MasterDnsVPN.exe` (Windows)
 3. Place it **next to the KevinNet app**
-4. Click **Save to MasterDNS Profiles** again — it copies automatically
+4. Click **Save to MasterDNS Profiles** again  it copies automatically
 
 ### vaydns-client binary missing
 
@@ -279,7 +279,7 @@ Use these exact filenames when placing next to KevinNet:
 
 1. Download and rename to the exact name above
 2. Place it **next to the KevinNet app**
-3. Click **Save to VayDNS Profiles** again — it copies automatically
+3. Click **Save to VayDNS Profiles** again  it copies automatically
 
 ---
 
@@ -303,7 +303,7 @@ chmod +x KevinNet_Linux_x64
 ```
 
 **Windows: antivirus blocks the app**
-This is a false positive — PyInstaller-compiled apps trigger some antivirus scanners. Add an exception for the file, or build from source yourself (see BUILD_INSTRUCTIONS.txt).
+This is a false positive  PyInstaller-compiled apps trigger some antivirus scanners. Add an exception for the file, or build from source yourself (see BUILD_INSTRUCTIONS.txt).
 
 ---
 
@@ -311,9 +311,9 @@ This is a false positive — PyInstaller-compiled apps trigger some antivirus sc
 
 **After clicking Save, the country folder has no `MasterDnsVPN` or `vaydns-client`**
 
-The binary must be placed **next to the KevinNet app** before saving — KevinNet copies it into the output folder. See [⚠️ Binary missing?](#-binary-missing) for download links and exact filenames.
+The binary must be placed **next to the KevinNet app** before saving  KevinNet copies it into the output folder. See [⚠️ Binary missing?](#-binary-missing) for download links and exact filenames.
 
-**macOS: `MasterDnsVPN` is there but won't run — "cannot be opened"**
+**macOS: `MasterDnsVPN` is there but won't run  "cannot be opened"**
 ```bash
 chmod +x /path/to/Iran/MasterDnsVPN
 xattr -d com.apple.quarantine /path/to/Iran/MasterDnsVPN
@@ -331,17 +331,17 @@ xattr -d com.apple.quarantine /path/to/Iran/vaydns-client-darwin-arm64
 
 **Finding 0–5 resolvers even after scanning**
 
-- Increase **Pool ×1000** from `200` to `500` — more IPs scanned = more found
-- Run the scan **2–3 times** — each run picks a different random set of IPs
+- Increase **Pool ×1000** from `200` to `500`  more IPs scanned = more found
+- Run the scan **2–3 times**  each run picks a different random set of IPs
 - Lower **Timeout** to `2s` if the scan takes too long (sacrifices some accuracy)
-- Increase **Concurrency** slightly — but do not go above `100` inside Iran
+- Increase **Concurrency** slightly  but do not go above `100` inside Iran
 
 **Phase 3 (E2E) passes zero resolvers**
 
 Phase 3 tests the actual tunnel through your server. Zero means either:
-- The server is down or misconfigured — check it is running
-- The tunnel domain DNS is not resolving — wait up to 48h after creating DNS records
-- The encryption key doesn't match the server — double-check `encrypt_key.txt`
+- The server is down or misconfigured  check it is running
+- The tunnel domain DNS is not resolving  wait up to 48h after creating DNS records
+- The encryption key doesn't match the server  double-check `encrypt_key.txt`
 
 ---
 
@@ -350,12 +350,12 @@ Phase 3 tests the actual tunnel through your server. Zero means either:
 **Connected but browser shows no internet / pages don't load**
 
 - Make sure your browser proxy is set to `SOCKS5 127.0.0.1:18000` (MasterDNS) or `SOCKS5 127.0.0.1:7000` (VayDNS)
-- Try a SOCKS5 proxy extension — Proxy SwitchyOmega for Chrome/Firefox works well
+- Try a SOCKS5 proxy extension  Proxy SwitchyOmega for Chrome/Firefox works well
 - Check that the VPN terminal is still open and running
 
 **Connected but very slow**
 
-For MasterDNS — try lowering MTU values:
+For MasterDNS  try lowering MTU values:
 - Set **Max Upload MTU** to `60–80` (smaller packets, less likely to be throttled)
 - Set **Max Download MTU** to `600`
 - Save changes in the Profiles tab and reconnect
@@ -378,13 +378,13 @@ The config file has an unfilled placeholder. This happens if you launch from the
 
 **Frequent disconnections / reconnects**
 
-- Increase **Packet Duplication** to `3` — more redundancy on lossy paths
-- Change **Balancing Strategy** to `3 — Least Loss`
-- Re-scan to get a fresh set of resolvers — old ones may have been blocked
+- Increase **Packet Duplication** to `3`  more redundancy on lossy paths
+- Change **Balancing Strategy** to `3  Least Loss`
+- Re-scan to get a fresh set of resolvers  old ones may have been blocked
 
 **Only a handful of resolvers work (most are ★1–2)**
 
-This is normal — most public DNS servers don't forward DNS queries for custom NS delegations. A score of 10–30 good resolvers from a scan of 200k IPs is a good result.
+This is normal  most public DNS servers don't forward DNS queries for custom NS delegations. A score of 10–30 good resolvers from a scan of 200k IPs is a good result.
 
 ---
 
@@ -392,13 +392,13 @@ This is normal — most public DNS servers don't forward DNS queries for custom 
 
 **"noise handshake: timeout" repeated in the terminal**
 
-The resolver is returning NXDOMAIN — it can't reach your tunnel server. The script will automatically move to the next resolver after `Resolver Timeout` seconds. If all resolvers fail:
-- Your tunnel domain DNS may not be set up correctly — verify NS delegation with `dig v.yourdomain.com NS`
+The resolver is returning NXDOMAIN  it can't reach your tunnel server. The script will automatically move to the next resolver after `Resolver Timeout` seconds. If all resolvers fail:
+- Your tunnel domain DNS may not be set up correctly  verify NS delegation with `dig v.yourdomain.com NS`
 - Try increasing **Resolver Timeout** to `90s` to give each resolver more time
 
 **VPN process keeps running after Ctrl+C**
 
-This was a known issue — fixed in the latest version. The launch script now uses `trap` to clean up background processes on exit. Re-save your profile to get the updated script.
+This was a known issue  fixed in the latest version. The launch script now uses `trap` to clean up background processes on exit. Re-save your profile to get the updated script.
 
 **"all resolvers exhausted" message**
 
@@ -407,7 +407,7 @@ All scanned resolvers failed within the timeout. Solutions:
 2. Enter a well-known public resolver in the **Resolver** field: `8.8.8.8:53`
 3. Check your server is running and the tunnel domain resolves correctly
 
-**Testing from outside Iran — NXDOMAIN on all resolvers**
+**Testing from outside Iran  NXDOMAIN on all resolvers**
 
 This is expected behaviour, not a bug. The scanned resolvers are Iranian public DNS servers. They only forward queries for your tunnel domain when accessed from inside Iran. Testing from Europe, Australia, or anywhere outside Iran will always fail.
 
@@ -448,9 +448,9 @@ See [BUILD_INSTRUCTIONS.txt](BUILD_INSTRUCTIONS.txt) (English) or [BUILD_INSTRUC
 
 ## 🙏 Credits
 
-**MasterDnsVPN** by MasterkinG32 (Amin Mahmoudi) — [GitHub](https://github.com/masterking32/MasterDnsVPN) — MIT License
+**MasterDnsVPN** by MasterkinG32 (Amin Mahmoudi)  [GitHub](https://github.com/masterking32/MasterDnsVPN)  MIT License
 
-**VayDNS** by net2share — [GitHub](https://github.com/net2share/vaydns) — fork of dnstt by David Fifield (public domain)
+**VayDNS** by net2share  [GitHub](https://github.com/net2share/vaydns)  fork of dnstt by David Fifield (public domain)
 
 See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for full license texts.
 
@@ -458,7 +458,7 @@ See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for full license texts.
 
 ## ⭐ Support This Project
 
-- **⭐ Star this repo** — helps others discover it
+- **⭐ Star this repo**  helps others discover it
 - **Share** with anyone in Iran who needs free internet
 - **Report bugs** via GitHub Issues
 
@@ -468,4 +468,4 @@ Every star and share helps this tool reach one more family that needs it.
 
 ## ⚖️ License & Disclaimer
 
-Copyright © 2026 Kevin Haji — [MIT License](LICENSE) — See [DISCLAIMER.md](DISCLAIMER.md)
+Copyright © 2026 Kevin Haji  [MIT License](LICENSE)  See [DISCLAIMER.md](DISCLAIMER.md)

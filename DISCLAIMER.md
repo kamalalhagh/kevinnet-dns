@@ -21,8 +21,8 @@ and performance of the software is with you.
 
 ### 2. Limitation of Liability
 
-The developers and contributors of this project — including Kevin Haji and
-MasterkinG32 — accept no responsibility for any direct, indirect, incidental,
+The developers and contributors of this project  including Kevin Haji and
+MasterkinG32  accept no responsibility for any direct, indirect, incidental,
 consequential, special, exemplary, or other damages arising from the use of
 this software or the inability to use it, even if advised of the possibility
 of such damage.

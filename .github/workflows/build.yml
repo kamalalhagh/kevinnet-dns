@@ -130,22 +130,7 @@ jobs:
           .venv/bin/pip install dnspython pyinstaller pillow --upgrade --quiet
       - name: Download MasterDnsVPN (macOS arm64)
         run: |
-          ZIP_URL=$(python3 -c "
-import json,urllib.request
-r=urllib.request.urlopen('https://api.github.com/repos/masterking32/MasterDnsVPN/releases/latest')
-assets=json.loads(r.read()).get('assets',[])
-names=[a['browser_download_url'] for a in assets
-       if 'client' in a['name'].lower()
-       and any(k in a['name'].lower() for k in ['mac','darwin','macos'])
-       and 'arm64' in a['name'].lower()
-       and a['name'].endswith('.zip')]
-if not names:
-    names=[a['browser_download_url'] for a in assets
-           if 'client' in a['name'].lower()
-           and any(k in a['name'].lower() for k in ['mac','darwin','macos'])
-           and a['name'].endswith('.zip')]
-print(names[0] if names else '')
-")
+          ZIP_URL=$(curl -s https://api.github.com/repos/masterking32/MasterDnsVPN/releases/latest | python3 -c "import sys,json; assets=json.load(sys.stdin).get('assets',[]); names=[a['browser_download_url'] for a in assets if 'client' in a['name'].lower() and any(k in a['name'].lower() for k in ['mac','darwin','macos']) and 'arm64' in a['name'].lower() and a['name'].endswith('.zip')]; names=names or [a['browser_download_url'] for a in assets if 'client' in a['name'].lower() and any(k in a['name'].lower() for k in ['mac','darwin','macos']) and a['name'].endswith('.zip')]; print(names[0] if names else '')")
           if [ -n "$ZIP_URL" ]; then
             curl -fsSL "$ZIP_URL" -o masterdns_mac.zip
             unzip -o masterdns_mac.zip -d masterdns_mac/
@@ -204,22 +189,7 @@ print(names[0] if names else '')
           arch -x86_64 .venv_x86/bin/pip install dnspython pyinstaller pillow --upgrade --quiet
       - name: Download MasterDnsVPN (macOS Intel / amd64)
         run: |
-          ZIP_URL=$(python3 -c "
-import json,urllib.request
-r=urllib.request.urlopen('https://api.github.com/repos/masterking32/MasterDnsVPN/releases/latest')
-assets=json.loads(r.read()).get('assets',[])
-names=[a['browser_download_url'] for a in assets
-       if 'client' in a['name'].lower()
-       and any(k in a['name'].lower() for k in ['mac','darwin','macos'])
-       and any(k in a['name'].lower() for k in ['amd64','x86_64','intel'])
-       and a['name'].endswith('.zip')]
-if not names:
-    names=[a['browser_download_url'] for a in assets
-           if 'client' in a['name'].lower()
-           and any(k in a['name'].lower() for k in ['mac','darwin','macos'])
-           and a['name'].endswith('.zip')]
-print(names[0] if names else '')
-")
+          ZIP_URL=$(curl -s https://api.github.com/repos/masterking32/MasterDnsVPN/releases/latest | python3 -c "import sys,json; assets=json.load(sys.stdin).get('assets',[]); names=[a['browser_download_url'] for a in assets if 'client' in a['name'].lower() and any(k in a['name'].lower() for k in ['mac','darwin','macos']) and any(k in a['name'].lower() for k in ['amd64','x86_64','intel']) and a['name'].endswith('.zip')]; names=names or [a['browser_download_url'] for a in assets if 'client' in a['name'].lower() and any(k in a['name'].lower() for k in ['mac','darwin','macos']) and a['name'].endswith('.zip')]; print(names[0] if names else '')")
           if [ -n "$ZIP_URL" ]; then
             curl -fsSL "$ZIP_URL" -o masterdns_mac.zip
             unzip -o masterdns_mac.zip -d masterdns_mac/
@@ -302,16 +272,7 @@ print(names[0] if names else '')
         run: python -m pip install dnspython pyinstaller pillow --upgrade --quiet
       - name: Download MasterDnsVPN (linux amd64)
         run: |
-          ZIP_URL=$(python3 -c "
-import json,urllib.request
-r=urllib.request.urlopen('https://api.github.com/repos/masterking32/MasterDnsVPN/releases/latest')
-assets=json.loads(r.read()).get('assets',[])
-names=[a['browser_download_url'] for a in assets
-       if 'client' in a['name'].lower() and 'linux' in a['name'].lower()
-       and 'amd64' in a['name'].lower() and 'legacy' not in a['name'].lower()
-       and a['name'].endswith('.zip')]
-print(names[0] if names else '')
-")
+          ZIP_URL=$(curl -s https://api.github.com/repos/masterking32/MasterDnsVPN/releases/latest | python3 -c "import sys,json; assets=json.load(sys.stdin).get('assets',[]); names=[a['browser_download_url'] for a in assets if 'client' in a['name'].lower() and 'linux' in a['name'].lower() and 'amd64' in a['name'].lower() and 'legacy' not in a['name'].lower() and a['name'].endswith('.zip')]; print(names[0] if names else '')")
           if [ -n "$ZIP_URL" ]; then
             curl -fsSL "$ZIP_URL" -o masterdns_linux.zip
             unzip -o masterdns_linux.zip -d masterdns_linux/
@@ -361,20 +322,7 @@ print(names[0] if names else '')
         run: python -m pip install dnspython pyinstaller pillow --upgrade --quiet
       - name: Download MasterDnsVPN (linux arm64)
         run: |
-          ZIP_URL=$(python3 -c "
-import json,urllib.request
-r=urllib.request.urlopen('https://api.github.com/repos/masterking32/MasterDnsVPN/releases/latest')
-assets=json.loads(r.read()).get('assets',[])
-names=[a['browser_download_url'] for a in assets
-       if 'client' in a['name'].lower() and 'linux' in a['name'].lower()
-       and 'arm64' in a['name'].lower() and 'legacy' not in a['name'].lower()
-       and a['name'].endswith('.zip')]
-if not names:
-    names=[a['browser_download_url'] for a in assets
-           if 'client' in a['name'].lower() and 'linux' in a['name'].lower()
-           and 'arm64' in a['name'].lower() and a['name'].endswith('.zip')]
-print(names[0] if names else '')
-")
+          ZIP_URL=$(curl -s https://api.github.com/repos/masterking32/MasterDnsVPN/releases/latest | python3 -c "import sys,json; assets=json.load(sys.stdin).get('assets',[]); names=[a['browser_download_url'] for a in assets if 'client' in a['name'].lower() and 'linux' in a['name'].lower() and 'arm64' in a['name'].lower() and 'legacy' not in a['name'].lower() and a['name'].endswith('.zip')]; names=names or [a['browser_download_url'] for a in assets if 'client' in a['name'].lower() and 'linux' in a['name'].lower() and 'arm64' in a['name'].lower() and a['name'].endswith('.zip')]; print(names[0] if names else '')")
           if [ -n "$ZIP_URL" ]; then
             curl -fsSL "$ZIP_URL" -o masterdns_linux.zip
             unzip -o masterdns_linux.zip -d masterdns_linux/

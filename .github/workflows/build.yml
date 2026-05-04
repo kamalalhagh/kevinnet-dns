@@ -141,14 +141,7 @@ jobs:
           fi
       - name: Download vaydns-client (darwin arm64)
         run: |
-          ASSET_URL=$(curl -s https://api.github.com/repos/net2share/vaydns/releases/latest | python3 -c "import sys,json; assets=json.load(sys.stdin).get('assets',[]); names=[a['browser_download_url'] for a in assets if 'darwin' in a['name'].lower() and 'arm64' in a['name'].lower()]; names = names or [a['browser_download_url'] for a in assets if 'darwin' in a['name'].lower()]; print(names[0] if names else '')")
-          if [ -n "$ASSET_URL" ]; then
-            FNAME=$(basename "$ASSET_URL")
-            curl -fsSL "$ASSET_URL" -o "$FNAME" && chmod +x "$FNAME"
-            echo "Downloaded: $FNAME"
-          else
-            echo "WARNING: vaydns darwin arm64 not found in latest release"
-          fi
+          curl -fsSL "https://github.com/net2share/vaydns/releases/latest/download/vaydns-client-darwin-arm64" -o vaydns-client-darwin-arm64 && chmod +x vaydns-client-darwin-arm64 && echo "Downloaded vaydns-client-darwin-arm64" || echo "WARNING: vaydns darwin arm64 download failed"
       - name: Build arm64
         run: |
           ADD_DATA=""
@@ -195,14 +188,7 @@ jobs:
           fi
       - name: Download vaydns-client (darwin amd64)
         run: |
-          ASSET_URL=$(curl -s https://api.github.com/repos/net2share/vaydns/releases/latest | python3 -c "import sys,json; assets=json.load(sys.stdin).get('assets',[]); names=[a['browser_download_url'] for a in assets if 'darwin' in a['name'].lower() and 'amd64' in a['name'].lower()]; names = names or [a['browser_download_url'] for a in assets if 'darwin' in a['name'].lower()]; print(names[0] if names else '')")
-          if [ -n "$ASSET_URL" ]; then
-            FNAME=$(basename "$ASSET_URL")
-            curl -fsSL "$ASSET_URL" -o "$FNAME" && chmod +x "$FNAME"
-            echo "Downloaded: $FNAME"
-          else
-            echo "WARNING: vaydns darwin amd64 not found in latest release"
-          fi
+          curl -fsSL "https://github.com/net2share/vaydns/releases/latest/download/vaydns-client-darwin-amd64" -o vaydns-client-darwin-amd64 && chmod +x vaydns-client-darwin-amd64 && echo "Downloaded vaydns-client-darwin-amd64" || echo "WARNING: vaydns darwin amd64 download failed"
       - name: Build x86_64 binary
         run: |
           ADD_DATA=""

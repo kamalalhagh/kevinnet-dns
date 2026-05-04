@@ -3377,21 +3377,51 @@ def run_e2e_verify(found_ips: list, domain: str, timeout_s: float,
 # ═══════════════════════════════════════════════════════════════
 #  BIDI FIX — Persian/Arabic text rendering
 # ═══════════════════════════════════════════════════════════════
-# Tkinter on Windows AND Linux (without a proper Arabic-capable font stack)
-# does not auto-reorder RTL text. Persian words appear fully reversed.
-# Fix: prepend U+200F (RIGHT-TO-LEFT MARK) to any string containing
-# Persian/Arabic characters. Monkey-patching Label/Button etc. catches
-# every string automatically. macOS has native CoreText BiDi — excluded.
+# ── Linux: install bundled Vazirmatn font so tkinter/fontconfig can use it ───
+if sys.platform == "linux":
+    def _install_bundled_font() -> None:
+        import shutil, subprocess
+        search = [app_dir()]
+        if getattr(sys, "frozen", False):
+            search.append(Path(getattr(sys, "_MEIPASS", "")))
+        for base in search:
+            src = base / "Vazirmatn-Regular.ttf"
+            if src.exists():
+                fonts_dir = Path.home() / ".fonts"
+                fonts_dir.mkdir(exist_ok=True)
+                dst = fonts_dir / "Vazirmatn-Regular.ttf"
+                if not dst.exists():
+                    shutil.copy2(src, dst)
+                    subprocess.run(["fc-cache", "-f", str(fonts_dir)],
+                                   capture_output=True, timeout=10)
+                break
+    try:
+        _install_bundled_font()
+    except Exception:
+        pass
+
+# Tkinter on Windows AND Linux does not auto-join Arabic/Persian characters
+# or reorder RTL text. Fix: use arabic_reshaper + python-bidi to both
+# reshape (join characters) and reorder (RTL display) Persian strings.
+# Falls back to RLM-only if libraries are missing.
+# macOS has native CoreText BiDi — excluded.
 _needs_bidi_fix = sys.platform in ("win32", "linux")
 if _needs_bidi_fix:
-    _RLM = "\u200f"   # RIGHT-TO-LEFT MARK
-
-    def _bidi(s):
-        """Prepend RLM to Persian/Arabic strings for correct Windows rendering."""
-        if isinstance(s, str) and not s.startswith(_RLM):
-            if any("\u0600" <= c <= "\u06ff" for c in s):
-                return _RLM + s
-        return s
+    try:
+        import arabic_reshaper as _ar
+        from bidi.algorithm import get_display as _bidi_display
+        def _bidi(s: str) -> str:
+            if isinstance(s, str) and any("\u0600" <= c <= "\u06ff" for c in s):
+                return _bidi_display(_ar.reshape(s))
+            return s
+    except ImportError:
+        # Fallback: direction fix only — characters may still appear unjoined
+        _RLM = "\u200f"
+        def _bidi(s: str) -> str:  # type: ignore[misc]
+            if isinstance(s, str) and not s.startswith(_RLM):
+                if any("\u0600" <= c <= "\u06ff" for c in s):
+                    return _RLM + s
+            return s
 
     def _patch_widget(cls):
         _oi = cls.__init__

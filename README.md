@@ -251,18 +251,23 @@ Every save creates a profile in `masterdns_profiles/` or `vaydns_profiles/` next
 
 ### MasterDnsVPN binary missing
 
+> **KevinNet v3.0.9+ bundles the correct binary automatically for every platform — upgrade first before trying manual steps below.**
+
 Download the client binary from the [MasterDnsVPN releases](https://github.com/masterking32/MasterDnsVPN/releases/latest):
 
 | Platform | Download |
 |---|---|
-| Windows AMD64 | [MasterDnsVPN_Client_Windows_AMD64.zip](https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_Windows_AMD64.zip) |
-| Windows ARM64 | [MasterDnsVPN_Client_Windows_ARM64.zip](https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_Windows_ARM64.zip) |
-| macOS AMD64 | [MasterDnsVPN_Client_MacOS_AMD64.zip](https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_MacOS_AMD64.zip) |
+| 🐧 Linux x64 | [MasterDnsVPN_Client_Linux_AMD64.zip](https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_Linux_AMD64.zip) |
+| 🐧 Linux ARM64 | [MasterDnsVPN_Client_Linux_ARM64.zip](https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_Linux_ARM64.zip) |
+| 🐧 Linux x64 (legacy glibc) | [MasterDnsVPN_Client_Linux-Legacy_AMD64.zip](https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_Linux-Legacy_AMD64.zip) |
+| 🪟 Windows x64 | [MasterDnsVPN_Client_Windows_AMD64.zip](https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_Windows_AMD64.zip) |
+| 🪟 Windows ARM64 | [MasterDnsVPN_Client_Windows_ARM64.zip](https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_Windows_ARM64.zip) |
+| 🍎 macOS (all) | [MasterDnsVPN releases page](https://github.com/masterking32/MasterDnsVPN/releases/latest) |
 
 1. Extract the ZIP
 2. Rename the binary to `MasterDnsVPN` (macOS/Linux) or `MasterDnsVPN.exe` (Windows)
 3. Place it **next to the KevinNet app**
-4. Click **Save to MasterDNS Profiles** again  it copies automatically
+4. Click **Save to MasterDNS Profiles** again — it copies automatically
 
 ### vaydns-client binary missing
 

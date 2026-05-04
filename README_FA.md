@@ -253,18 +253,23 @@ cat server.pub
 
 ### باینری MasterDnsVPN نیست
 
+> **KevinNet نسخه v3.0.9 به بعد باینری مناسب هر پلتفرم را به صورت خودکار بسته‌بندی می‌کند — ابتدا KevinNet را آپدیت کنید.**
+
 کلاینت را از [صفحه releases مستر](https://github.com/masterking32/MasterDnsVPN/releases/latest) دانلود کنید:
 
 | پلتفرم | لینک |
 |---|---|
-| ویندوز AMD64 | [MasterDnsVPN_Client_Windows_AMD64.zip](https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_Windows_AMD64.zip) |
-| ویندوز ARM64 | [MasterDnsVPN_Client_Windows_ARM64.zip](https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_Windows_ARM64.zip) |
-| مک AMD64 | [MasterDnsVPN_Client_MacOS_AMD64.zip](https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_MacOS_AMD64.zip) |
+| 🐧 لینوکس x64 | [MasterDnsVPN_Client_Linux_AMD64.zip](https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_Linux_AMD64.zip) |
+| 🐧 لینوکس ARM64 | [MasterDnsVPN_Client_Linux_ARM64.zip](https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_Linux_ARM64.zip) |
+| 🐧 لینوکس x64 (glibc قدیمی) | [MasterDnsVPN_Client_Linux-Legacy_AMD64.zip](https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_Linux-Legacy_AMD64.zip) |
+| 🪟 ویندوز AMD64 | [MasterDnsVPN_Client_Windows_AMD64.zip](https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_Windows_AMD64.zip) |
+| 🪟 ویندوز ARM64 | [MasterDnsVPN_Client_Windows_ARM64.zip](https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_Windows_ARM64.zip) |
+| 🍎 مک | [صفحه releases](https://github.com/masterking32/MasterDnsVPN/releases/latest) |
 
 ۱. ZIP را باز کنید
 ۲. باینری را به `MasterDnsVPN` (مک/لینوکس) یا `MasterDnsVPN.exe` (ویندوز) تغییر نام دهید
 ۳. **کنار برنامه KevinNet** بگذارید
-۴. دوباره **ذخیره در MasterDNS** کلیک کنید  به صورت خودکار کپی می‌شود
+۴. دوباره **ذخیره در MasterDNS** کلیک کنید — به صورت خودکار کپی می‌شود
 
 ### باینری vaydns-client نیست
 

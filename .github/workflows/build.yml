@@ -19,6 +19,25 @@ jobs:
           architecture: "x64"
       - name: Install packages
         run: python -m pip install dnspython pyinstaller pillow --upgrade --quiet
+      - name: Download MasterDnsVPN (Windows amd64)
+        shell: pwsh
+        run: |
+          $release = Invoke-RestMethod "https://api.github.com/repos/masterking32/MasterDnsVPN/releases/latest"
+          $asset = $release.assets | Where-Object {
+            $_.name -match "(?i)client" -and $_.name -match "(?i)windows" -and
+            $_.name -match "(?i)(amd64|x64|x86_64)" -and $_.name -match "\.zip$"
+          } | Select-Object -First 1
+          if (-not $asset) {
+            $asset = $release.assets | Where-Object {
+              $_.name -match "(?i)client" -and $_.name -match "(?i)windows" -and $_.name -match "\.zip$"
+            } | Select-Object -First 1
+          }
+          if ($asset) {
+            Invoke-WebRequest -Uri $asset.browser_download_url -OutFile "mdns_win.zip"
+            Expand-Archive -Path "mdns_win.zip" -DestinationPath "mdns_win/" -Force
+            $bin = Get-ChildItem -Path "mdns_win/" -Recurse -Filter "MasterDnsVPN_Client_Windows*.exe" | Select-Object -First 1
+            if ($bin) { Copy-Item $bin.FullName "MasterDnsVPN.exe"; Write-Host "Bundling MasterDnsVPN.exe (windows amd64)" }
+          } else { Write-Host "WARNING: MasterDnsVPN windows/amd64 not found" }
       - name: Download vaydns-client (Windows amd64)
         shell: pwsh
         run: |
@@ -57,6 +76,26 @@ jobs:
           python-version: "3.12"
       - name: Install packages
         run: python -m pip install dnspython pyinstaller pillow --upgrade --quiet
+      - name: Download MasterDnsVPN (Windows arm64/amd64)
+        shell: pwsh
+        run: |
+          $release = Invoke-RestMethod "https://api.github.com/repos/masterking32/MasterDnsVPN/releases/latest"
+          $asset = $release.assets | Where-Object {
+            $_.name -match "(?i)client" -and $_.name -match "(?i)windows" -and
+            $_.name -match "(?i)arm64" -and $_.name -match "\.zip$"
+          } | Select-Object -First 1
+          if (-not $asset) {
+            # fallback to amd64 — Windows on ARM runs x64 via emulation
+            $asset = $release.assets | Where-Object {
+              $_.name -match "(?i)client" -and $_.name -match "(?i)windows" -and $_.name -match "\.zip$"
+            } | Select-Object -First 1
+          }
+          if ($asset) {
+            Invoke-WebRequest -Uri $asset.browser_download_url -OutFile "mdns_win.zip"
+            Expand-Archive -Path "mdns_win.zip" -DestinationPath "mdns_win/" -Force
+            $bin = Get-ChildItem -Path "mdns_win/" -Recurse -Filter "MasterDnsVPN_Client_Windows*.exe" | Select-Object -First 1
+            if ($bin) { Copy-Item $bin.FullName "MasterDnsVPN.exe"; Write-Host "Bundling MasterDnsVPN.exe (windows arm64 fallback)" }
+          } else { Write-Host "WARNING: MasterDnsVPN windows not found" }
       - name: Download vaydns-client (Windows arm64)
         shell: pwsh
         run: |
@@ -90,6 +129,30 @@ jobs:
           brew install python@3.12 python-tk@3.12
           /opt/homebrew/opt/python@3.12/bin/python3.12 -m venv .venv
           .venv/bin/pip install dnspython pyinstaller pillow --upgrade --quiet
+      - name: Download MasterDnsVPN (macOS arm64)
+        run: |
+          ZIP_URL=$(curl -s https://api.github.com/repos/masterking32/MasterDnsVPN/releases/latest | python3 -c "
+          import sys,json
+          assets=json.load(sys.stdin).get('assets',[])
+          url=next((a['browser_download_url'] for a in assets
+                    if 'client' in a['name'].lower()
+                    and ('mac' in a['name'].lower() or 'darwin' in a['name'].lower())
+                    and 'arm64' in a['name'].lower()
+                    and a['name'].endswith('.zip')),\'\')
+          if not url:
+            url=next((a['browser_download_url'] for a in assets
+                      if 'client' in a['name'].lower()
+                      and ('mac' in a['name'].lower() or 'darwin' in a['name'].lower())
+                      and a['name'].endswith('.zip')),\'\')
+          print(url)")
+          if [ -n "$ZIP_URL" ]; then
+            curl -fsSL "$ZIP_URL" -o masterdns_mac.zip
+            unzip -o masterdns_mac.zip -d masterdns_mac/
+            BIN=$(find masterdns_mac/ -type f \( -name "*Client*Mac*" -o -name "*Client*Darwin*" \) | head -1)
+            [ -n "$BIN" ] && cp "$BIN" MasterDnsVPN && chmod +x MasterDnsVPN && echo "Bundling MasterDnsVPN (macOS arm64)"
+          else
+            echo "WARNING: MasterDnsVPN macOS arm64 binary not found"
+          fi
       - name: Download vaydns-client (darwin arm64)
         run: |
           ASSET_URL=$(curl -s https://api.github.com/repos/net2share/vaydns/releases/latest | python3 -c "
@@ -138,6 +201,30 @@ jobs:
         run: |
           arch -x86_64 /usr/local/bin/python3.12 -m venv .venv_x86
           arch -x86_64 .venv_x86/bin/pip install dnspython pyinstaller pillow --upgrade --quiet
+      - name: Download MasterDnsVPN (macOS Intel / amd64)
+        run: |
+          ZIP_URL=$(curl -s https://api.github.com/repos/masterking32/MasterDnsVPN/releases/latest | python3 -c "
+          import sys,json
+          assets=json.load(sys.stdin).get('assets',[])
+          url=next((a['browser_download_url'] for a in assets
+                    if 'client' in a['name'].lower()
+                    and ('mac' in a['name'].lower() or 'darwin' in a['name'].lower())
+                    and ('amd64' in a['name'].lower() or 'x86_64' in a['name'].lower())
+                    and a['name'].endswith('.zip')),\'\')
+          if not url:
+            url=next((a['browser_download_url'] for a in assets
+                      if 'client' in a['name'].lower()
+                      and ('mac' in a['name'].lower() or 'darwin' in a['name'].lower())
+                      and a['name'].endswith('.zip')),\'\')
+          print(url)")
+          if [ -n "$ZIP_URL" ]; then
+            curl -fsSL "$ZIP_URL" -o masterdns_mac.zip
+            unzip -o masterdns_mac.zip -d masterdns_mac/
+            BIN=$(find masterdns_mac/ -type f \( -name "*Client*Mac*" -o -name "*Client*Darwin*" \) | head -1)
+            [ -n "$BIN" ] && cp "$BIN" MasterDnsVPN && chmod +x MasterDnsVPN && echo "Bundling MasterDnsVPN (macOS Intel)"
+          else
+            echo "WARNING: MasterDnsVPN macOS Intel binary not found"
+          fi
       - name: Download vaydns-client (darwin amd64)
         run: |
           ASSET_URL=$(curl -s https://api.github.com/repos/net2share/vaydns/releases/latest | python3 -c "
@@ -210,6 +297,26 @@ jobs:
         run: sudo apt-get install -y python3-tk
       - name: Install packages
         run: python -m pip install dnspython pyinstaller pillow --upgrade --quiet
+      - name: Download MasterDnsVPN (linux amd64)
+        run: |
+          ZIP_URL=$(curl -s https://api.github.com/repos/masterking32/MasterDnsVPN/releases/latest | python3 -c "
+          import sys,json
+          assets=json.load(sys.stdin).get('assets',[])
+          url=next((a['browser_download_url'] for a in assets
+                    if 'client' in a['name'].lower()
+                    and 'linux' in a['name'].lower()
+                    and 'amd64' in a['name'].lower()
+                    and 'legacy' not in a['name'].lower()
+                    and a['name'].endswith('.zip')),\'\')
+          print(url)")
+          if [ -n "$ZIP_URL" ]; then
+            curl -fsSL "$ZIP_URL" -o masterdns_linux.zip
+            unzip -o masterdns_linux.zip -d masterdns_linux/
+            BIN=$(find masterdns_linux/ -type f -name "MasterDnsVPN_Client_Linux*AMD64" | head -1)
+            [ -n "$BIN" ] && cp "$BIN" MasterDnsVPN && chmod +x MasterDnsVPN && echo "Bundling MasterDnsVPN (linux amd64)"
+          else
+            echo "WARNING: MasterDnsVPN linux/amd64 binary not found — MasterDNS mode unavailable"
+          fi
       - name: Download vaydns-client (linux amd64)
         run: |
           ASSET_URL=$(curl -s https://api.github.com/repos/net2share/vaydns/releases/latest | python3 -c "
@@ -249,6 +356,26 @@ jobs:
         run: sudo apt-get install -y python3-tk
       - name: Install packages
         run: python -m pip install dnspython pyinstaller pillow --upgrade --quiet
+      - name: Download MasterDnsVPN (linux arm64)
+        run: |
+          ZIP_URL=$(curl -s https://api.github.com/repos/masterking32/MasterDnsVPN/releases/latest | python3 -c "
+          import sys,json
+          assets=json.load(sys.stdin).get('assets',[])
+          url=next((a['browser_download_url'] for a in assets
+                    if 'client' in a['name'].lower()
+                    and 'linux' in a['name'].lower()
+                    and 'arm64' in a['name'].lower()
+                    and 'legacy' not in a['name'].lower()
+                    and a['name'].endswith('.zip')),\'\')
+          print(url)")
+          if [ -n "$ZIP_URL" ]; then
+            curl -fsSL "$ZIP_URL" -o masterdns_linux.zip
+            unzip -o masterdns_linux.zip -d masterdns_linux/
+            BIN=$(find masterdns_linux/ -type f -name "MasterDnsVPN_Client_Linux*ARM64" | head -1)
+            [ -n "$BIN" ] && cp "$BIN" MasterDnsVPN && chmod +x MasterDnsVPN && echo "Bundling MasterDnsVPN (linux arm64)"
+          else
+            echo "WARNING: MasterDnsVPN linux/arm64 binary not found — MasterDNS mode unavailable"
+          fi
       - name: Download vaydns-client (linux arm64)
         run: |
           ASSET_URL=$(curl -s https://api.github.com/repos/net2share/vaydns/releases/latest | python3 -c "

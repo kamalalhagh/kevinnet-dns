@@ -130,14 +130,14 @@ jobs:
           .venv/bin/pip install dnspython pyinstaller pillow --upgrade --quiet
       - name: Download MasterDnsVPN (macOS arm64)
         run: |
-          ZIP_URL=$(curl -s https://api.github.com/repos/masterking32/MasterDnsVPN/releases/latest | python3 -c "import sys,json; assets=json.load(sys.stdin).get('assets',[]); names=[a['browser_download_url'] for a in assets if 'client' in a['name'].lower() and any(k in a['name'].lower() for k in ['mac','darwin','macos']) and 'arm64' in a['name'].lower() and a['name'].endswith('.zip')]; names=names or [a['browser_download_url'] for a in assets if 'client' in a['name'].lower() and any(k in a['name'].lower() for k in ['mac','darwin','macos']) and a['name'].endswith('.zip')]; print(names[0] if names else '')")
-          if [ -n "$ZIP_URL" ]; then
-            curl -fsSL "$ZIP_URL" -o masterdns_mac.zip
-            unzip -o masterdns_mac.zip -d masterdns_mac/
-            BIN=$(find masterdns_mac/ -type f -name "MasterDnsVPN_Client_*" | head -1)
-            [ -n "$BIN" ] && cp "$BIN" MasterDnsVPN && chmod +x MasterDnsVPN && echo "Bundling MasterDnsVPN (macOS arm64)"
+          curl -fsSL "https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_MacOS_ARM64.zip" -o masterdns_mac.zip
+          unzip -o masterdns_mac.zip -d masterdns_mac/
+          BIN=$(find masterdns_mac/ -type f ! -name "*.toml" ! -name "*.txt" ! -name "*.html" ! -name "*.md" | head -1)
+          if [ -n "$BIN" ]; then
+            cp "$BIN" MasterDnsVPN && chmod +x MasterDnsVPN
+            echo "Bundling MasterDnsVPN (macOS arm64): $BIN"
           else
-            echo "WARNING: MasterDnsVPN macOS arm64 not found"
+            echo "WARNING: MasterDnsVPN macOS arm64 binary not found in zip"
           fi
       - name: Download vaydns-client (darwin arm64)
         run: |
@@ -184,14 +184,14 @@ jobs:
           arch -x86_64 .venv_x86/bin/pip install dnspython pyinstaller pillow --upgrade --quiet
       - name: Download MasterDnsVPN (macOS Intel / amd64)
         run: |
-          ZIP_URL=$(curl -s https://api.github.com/repos/masterking32/MasterDnsVPN/releases/latest | python3 -c "import sys,json; assets=json.load(sys.stdin).get('assets',[]); names=[a['browser_download_url'] for a in assets if 'client' in a['name'].lower() and any(k in a['name'].lower() for k in ['mac','darwin','macos']) and any(k in a['name'].lower() for k in ['amd64','x86_64','intel']) and a['name'].endswith('.zip')]; names=names or [a['browser_download_url'] for a in assets if 'client' in a['name'].lower() and any(k in a['name'].lower() for k in ['mac','darwin','macos']) and a['name'].endswith('.zip')]; print(names[0] if names else '')")
-          if [ -n "$ZIP_URL" ]; then
-            curl -fsSL "$ZIP_URL" -o masterdns_mac.zip
-            unzip -o masterdns_mac.zip -d masterdns_mac/
-            BIN=$(find masterdns_mac/ -type f -name "MasterDnsVPN_Client_*" | head -1)
-            [ -n "$BIN" ] && cp "$BIN" MasterDnsVPN && chmod +x MasterDnsVPN && echo "Bundling MasterDnsVPN (macOS Intel)"
+          curl -fsSL "https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_MacOS_AMD64.zip" -o masterdns_mac.zip
+          unzip -o masterdns_mac.zip -d masterdns_mac/
+          BIN=$(find masterdns_mac/ -type f ! -name "*.toml" ! -name "*.txt" ! -name "*.html" ! -name "*.md" | head -1)
+          if [ -n "$BIN" ]; then
+            cp "$BIN" MasterDnsVPN && chmod +x MasterDnsVPN
+            echo "Bundling MasterDnsVPN (macOS Intel): $BIN"
           else
-            echo "WARNING: MasterDnsVPN macOS Intel not found"
+            echo "WARNING: MasterDnsVPN macOS Intel binary not found in zip"
           fi
       - name: Download vaydns-client (darwin amd64)
         run: |

@@ -44,7 +44,24 @@
 > xattr -d com.apple.quarantine KevinNet_macOS_Universal
 > ```
 
-> **لینوکس:** قبل از اجرا `chmod +x KevinNet_Linux_x64` بزنید.
+> ---
+
+### لینوکس: متن فارسی ناخوانا یا حروف جدا از هم نمایش داده می‌شود
+
+**حروف فارسی/عربی به صورت ایزوله، غیرمتصل یا با ترتیب اشتباه نمایش داده می‌شوند**
+
+این مشکل زمانی رخ می‌دهد که سیستم‌عامل فونت عربی/فارسی مناسب نداشته باشد. KevinNet نسخه v3.1.1 به بعد فونت Vazirmatn را به صورت خودکار در اولین اجرا نصب می‌کند. اگر متن هنوز ناخواناست:
+
+```bash
+# نصب فونت فارسی به صورت دستی
+sudo apt install fonts-noto fonts-noto-extra   # دبیان/اوبونتو
+sudo dnf install google-noto-sans-arabic-fonts  # فدورا
+sudo pacman -S noto-fonts                        # آرچ
+```
+
+سپس KevinNet را دوباره اجرا کنید.
+
+**لینوکس:** قبل از اجرا `chmod +x KevinNet_Linux_x64` بزنید.
 
 ---
 
@@ -253,7 +270,7 @@ cat server.pub
 
 ### باینری MasterDnsVPN نیست
 
-> **KevinNet نسخه v3.0.9 به بعد باینری مناسب هر پلتفرم را به صورت خودکار بسته‌بندی می‌کند — ابتدا KevinNet را آپدیت کنید.**
+> **KevinNet نسخه v3.1.1 به بعد باینری مناسب هر پلتفرم را به صورت خودکار بسته‌بندی می‌کند — ابتدا KevinNet را آپدیت کنید.**
 
 کلاینت را از [صفحه releases مستر](https://github.com/masterking32/MasterDnsVPN/releases/latest) دانلود کنید:
 
@@ -264,7 +281,8 @@ cat server.pub
 | 🐧 لینوکس x64 (glibc قدیمی) | [MasterDnsVPN_Client_Linux-Legacy_AMD64.zip](https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_Linux-Legacy_AMD64.zip) |
 | 🪟 ویندوز AMD64 | [MasterDnsVPN_Client_Windows_AMD64.zip](https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_Windows_AMD64.zip) |
 | 🪟 ویندوز ARM64 | [MasterDnsVPN_Client_Windows_ARM64.zip](https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_Windows_ARM64.zip) |
-| 🍎 مک | [صفحه releases](https://github.com/masterking32/MasterDnsVPN/releases/latest) |
+| 🍎 مک Apple Silicon | [MasterDnsVPN_Client_MacOS_ARM64.zip](https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_MacOS_ARM64.zip) |
+| 🍎 مک Intel | [MasterDnsVPN_Client_MacOS_AMD64.zip](https://github.com/masterking32/MasterDnsVPN/releases/latest/download/MasterDnsVPN_Client_MacOS_AMD64.zip) |
 
 ۱. ZIP را باز کنید
 ۲. باینری را به `MasterDnsVPN` (مک/لینوکس) یا `MasterDnsVPN.exe` (ویندوز) تغییر نام دهید

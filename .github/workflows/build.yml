@@ -138,12 +138,12 @@ jobs:
                     if 'client' in a['name'].lower()
                     and ('mac' in a['name'].lower() or 'darwin' in a['name'].lower())
                     and 'arm64' in a['name'].lower()
-                    and a['name'].endswith('.zip')),\'\')
+                    and a['name'].endswith('.zip')),"")
           if not url:
             url=next((a['browser_download_url'] for a in assets
                       if 'client' in a['name'].lower()
                       and ('mac' in a['name'].lower() or 'darwin' in a['name'].lower())
-                      and a['name'].endswith('.zip')),\'\')
+                      and a['name'].endswith('.zip')),"")
           print(url)")
           if [ -n "$ZIP_URL" ]; then
             curl -fsSL "$ZIP_URL" -o masterdns_mac.zip
@@ -210,12 +210,12 @@ jobs:
                     if 'client' in a['name'].lower()
                     and ('mac' in a['name'].lower() or 'darwin' in a['name'].lower())
                     and ('amd64' in a['name'].lower() or 'x86_64' in a['name'].lower())
-                    and a['name'].endswith('.zip')),\'\')
+                    and a['name'].endswith('.zip')),"")
           if not url:
             url=next((a['browser_download_url'] for a in assets
                       if 'client' in a['name'].lower()
                       and ('mac' in a['name'].lower() or 'darwin' in a['name'].lower())
-                      and a['name'].endswith('.zip')),\'\')
+                      and a['name'].endswith('.zip')),"")
           print(url)")
           if [ -n "$ZIP_URL" ]; then
             curl -fsSL "$ZIP_URL" -o masterdns_mac.zip
@@ -307,7 +307,7 @@ jobs:
                     and 'linux' in a['name'].lower()
                     and 'amd64' in a['name'].lower()
                     and 'legacy' not in a['name'].lower()
-                    and a['name'].endswith('.zip')),\'\')
+                    and a['name'].endswith('.zip')),"")
           print(url)")
           if [ -n "$ZIP_URL" ]; then
             curl -fsSL "$ZIP_URL" -o masterdns_linux.zip
@@ -366,7 +366,7 @@ jobs:
                     and 'linux' in a['name'].lower()
                     and 'arm64' in a['name'].lower()
                     and 'legacy' not in a['name'].lower()
-                    and a['name'].endswith('.zip')),\'\')
+                    and a['name'].endswith('.zip')),"")
           print(url)")
           if [ -n "$ZIP_URL" ]; then
             curl -fsSL "$ZIP_URL" -o masterdns_linux.zip

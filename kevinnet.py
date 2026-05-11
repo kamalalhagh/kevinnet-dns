@@ -3437,6 +3437,14 @@ if sys.platform == "win32":
 #                    own get_display would double-reverse the text.
 #                    On Linux (Tk dialogs, not native): same as _bidi.
 
+# Safe no-op fallback — overridden on Windows/Linux below.
+# Always defined so show_help and other module-level code can call _bidi()
+# on any platform without a NameError (macOS uses CoreText natively).
+def _bidi(s: str) -> str:          # type: ignore[misc]
+    return s
+def _bidi_native(s: str) -> str:   # type: ignore[misc]
+    return s
+
 _needs_bidi_fix = sys.platform in ("win32", "linux")
 if _needs_bidi_fix:
     try:
@@ -3928,7 +3936,7 @@ def show_help(parent, lang):
 
     tk.Frame(d, bg=BORDER, height=1).pack(fill="x", padx=24)
     tk.Button(d,
-              text="متوجه شدم  ✓" if lang == "fa" else "Got it  ✓",
+              text=_bidi("✓  متوجه شدم") if lang == "fa" else "Got it  ✓",
               bg=ACCENT, fg="#000000", font=ff(11, "bold"),
               relief="flat", bd=0, pady=11, padx=30, cursor="hand2",
               activebackground="#00bfa5", activeforeground="#000000",

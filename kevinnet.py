@@ -3419,43 +3419,74 @@ if sys.platform == "win32":
         pass
 
 # Tkinter on Windows AND Linux does not auto-join Arabic/Persian characters
-# or reorder RTL text. Fix: use arabic_reshaper + python-bidi to both
-# reshape (join characters) and reorder (RTL display) Persian strings.
-# Falls back to RLM-only if libraries are missing.
+# or reorder RTL text. Fix: use arabic_reshaper + python-bidi.
 # macOS has native CoreText BiDi — excluded.
 #
-# Windows-specific note: GDI treats Arabic Presentation Forms (the output of
-# arabic_reshaper) as strong-RTL (Unicode category AL) and applies its own
-# BiDi reordering on top of what python-bidi already did — doubling the
-# reversal and breaking the text.  Wrapping the processed string in
-# U+202D (Left-to-Right Override) … U+202C (Pop Directional Format)
-# forces GDI to render characters in their exact string order, preventing
-# the double-reorder.  Linux (FreeType) renders as-is so LRO is not needed.
+# Two bidi helpers are defined:
+#
+#  _bidi(s)        — for Tk widgets (Label, Button, Text, Treeview…).
+#                    On Windows: reshape + get_display + LRO…PDF wrapper so
+#                    GDI renders the already-visual-ordered string as-is.
+#                    On Linux: reshape + get_display (FreeType renders as-is).
+#                    Multi-line strings: each line processed independently.
+#
+#  _bidi_native(s) — for native Win32 dialogs (messagebox, window titles).
+#                    Win32's Uniscribe/DirectWrite already handles shaping
+#                    and BiDi from logical-order text.  Only a U+200F (RLM)
+#                    prefix is needed to signal RTL direction; applying our
+#                    own get_display would double-reverse the text.
+#                    On Linux (Tk dialogs, not native): same as _bidi.
+
 _needs_bidi_fix = sys.platform in ("win32", "linux")
 if _needs_bidi_fix:
     try:
         import arabic_reshaper as _ar
         from bidi.algorithm import get_display as _bidi_display
+
         if sys.platform == "win32":
-            # LRO (U+202D) + processed text + PDF (U+202C)
-            # prevents Windows GDI from double-applying BiDi reordering
-            def _bidi(s: str) -> str:
-                if isinstance(s, str) and any("\u0600" <= c <= "\u06ff" for c in s):
+            def _bidi_line(s: str) -> str:
+                if any("\u0600" <= c <= "\u06ff" for c in s):
+                    # LRO…PDF prevents GDI from double-applying BiDi on
+                    # the already-visual-ordered presentation forms
                     return "\u202d" + _bidi_display(_ar.reshape(s)) + "\u202c"
                 return s
-        else:
-            def _bidi(s: str) -> str:  # type: ignore[misc]
+
+            def _bidi(s: str) -> str:
                 if isinstance(s, str) and any("\u0600" <= c <= "\u06ff" for c in s):
+                    if "\n" in s:
+                        return "\n".join(_bidi_line(ln) for ln in s.split("\n"))
+                    return _bidi_line(s)
+                return s
+
+            def _bidi_native(s: str) -> str:
+                """Win32 native dialogs: RLM prefix only, Uniscribe handles the rest."""
+                if isinstance(s, str) and any("\u0600" <= c <= "\u06ff" for c in s):
+                    return "\u200f" + s
+                return s
+
+        else:  # linux — Tk uses FreeType which renders chars in string order
+            def _bidi_line(s: str) -> str:
+                if any("\u0600" <= c <= "\u06ff" for c in s):
                     return _bidi_display(_ar.reshape(s))
                 return s
+
+            def _bidi(s: str) -> str:  # type: ignore[misc]
+                if isinstance(s, str) and any("\u0600" <= c <= "\u06ff" for c in s):
+                    if "\n" in s:
+                        return "\n".join(_bidi_line(ln) for ln in s.split("\n"))
+                    return _bidi_line(s)
+                return s
+
+            _bidi_native = _bidi  # Linux Tk dialogs need same full processing
+
     except ImportError:
-        # Fallback: direction fix only — characters may still appear unjoined
         _RLM = "\u200f"
         def _bidi(s: str) -> str:  # type: ignore[misc]
             if isinstance(s, str) and not s.startswith(_RLM):
                 if any("\u0600" <= c <= "\u06ff" for c in s):
                     return _RLM + s
             return s
+        _bidi_native = _bidi  # type: ignore[misc]
 
     def _patch_widget(cls):
         _oi = cls.__init__
@@ -3483,8 +3514,6 @@ if _needs_bidi_fix:
     ttk.Label.configure = ttk.Label.config = _nc_ttk
 
     # ── ttk.Label.__init__ ───────────────────────────────────────
-    # configure is patched above but text= passed at construction time
-    # goes through __init__, not configure.
     _orig_ttk_label_init = ttk.Label.__init__
     def _ttk_label_init(self, master=None, **kw):
         if "text" in kw and isinstance(kw["text"], str):
@@ -3492,7 +3521,7 @@ if _needs_bidi_fix:
         _orig_ttk_label_init(self, master, **kw)
     ttk.Label.__init__ = _ttk_label_init
 
-    # ── tk.Text.insert (activity log uses scrolledtext / tk.Text) ─
+    # ── tk.Text.insert (activity log / scrolledtext) ─────────────
     _orig_text_insert = tk.Text.insert
     def _text_insert(self, index, chars, *args):
         if isinstance(chars, str):
@@ -3521,7 +3550,9 @@ if _needs_bidi_fix:
         return _orig_tree_item(self, item, option, **kw)
     ttk.Treeview.item = _tree_item_patch
 
-    # ── messagebox: all alert / confirm dialogs ──────────────────
+    # ── messagebox: native Win32 dialogs need _bidi_native ───────
+    # (Win32 MessageBoxW uses Uniscribe for shaping+BiDi from logical
+    # order; applying get_display would double-reverse the text)
     import tkinter.messagebox as _tkm
     for _mb_fn in ("showinfo", "showwarning", "showerror",
                    "askokcancel", "askyesno", "askretrycancel", "askquestion"):
@@ -3530,21 +3561,22 @@ if _needs_bidi_fix:
             def _make_mb_wrapper(_orig):
                 def _wrapper(title=None, message=None, **kw):
                     return _orig(
-                        _bidi(title)   if isinstance(title,   str) else title,
-                        _bidi(message) if isinstance(message, str) else message,
+                        _bidi_native(title)   if isinstance(title,   str) else title,
+                        _bidi_native(message) if isinstance(message, str) else message,
                         **kw)
                 return _wrapper
             setattr(_tkm, _mb_fn, _make_mb_wrapper(_mb_orig))
 
-    # ── simpledialog.askstring: rename / duplicate dialogs ───────
+    # ── simpledialog.askstring: Tk-rendered dialog, use full _bidi ─
     import tkinter.simpledialog as _tksd
     _sd_orig = _tksd.askstring
     def _sd_askstring(title=None, prompt=None, **kw):
         return _sd_orig(
-            _bidi(title)  if isinstance(title,  str) else title,
+            _bidi_native(title)  if isinstance(title,  str) else title,
             _bidi(prompt) if isinstance(prompt, str) else prompt,
             **kw)
     _tksd.askstring = _sd_askstring
+
 
 # ═══════════════════════════════════════════════════════════════
 #  DESIGN TOKENS — warm, modern, user-friendly palette

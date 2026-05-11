@@ -3423,15 +3423,31 @@ if sys.platform == "win32":
 # reshape (join characters) and reorder (RTL display) Persian strings.
 # Falls back to RLM-only if libraries are missing.
 # macOS has native CoreText BiDi — excluded.
+#
+# Windows-specific note: GDI treats Arabic Presentation Forms (the output of
+# arabic_reshaper) as strong-RTL (Unicode category AL) and applies its own
+# BiDi reordering on top of what python-bidi already did — doubling the
+# reversal and breaking the text.  Wrapping the processed string in
+# U+202D (Left-to-Right Override) … U+202C (Pop Directional Format)
+# forces GDI to render characters in their exact string order, preventing
+# the double-reorder.  Linux (FreeType) renders as-is so LRO is not needed.
 _needs_bidi_fix = sys.platform in ("win32", "linux")
 if _needs_bidi_fix:
     try:
         import arabic_reshaper as _ar
         from bidi.algorithm import get_display as _bidi_display
-        def _bidi(s: str) -> str:
-            if isinstance(s, str) and any("\u0600" <= c <= "\u06ff" for c in s):
-                return _bidi_display(_ar.reshape(s))
-            return s
+        if sys.platform == "win32":
+            # LRO (U+202D) + processed text + PDF (U+202C)
+            # prevents Windows GDI from double-applying BiDi reordering
+            def _bidi(s: str) -> str:
+                if isinstance(s, str) and any("\u0600" <= c <= "\u06ff" for c in s):
+                    return "\u202d" + _bidi_display(_ar.reshape(s)) + "\u202c"
+                return s
+        else:
+            def _bidi(s: str) -> str:  # type: ignore[misc]
+                if isinstance(s, str) and any("\u0600" <= c <= "\u06ff" for c in s):
+                    return _bidi_display(_ar.reshape(s))
+                return s
     except ImportError:
         # Fallback: direction fix only — characters may still appear unjoined
         _RLM = "\u200f"

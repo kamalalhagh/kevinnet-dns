@@ -3482,6 +3482,70 @@ if _needs_bidi_fix:
         return _oc_ttk(self, **kw)
     ttk.Label.configure = ttk.Label.config = _nc_ttk
 
+    # ── ttk.Label.__init__ ───────────────────────────────────────
+    # configure is patched above but text= passed at construction time
+    # goes through __init__, not configure.
+    _orig_ttk_label_init = ttk.Label.__init__
+    def _ttk_label_init(self, master=None, **kw):
+        if "text" in kw and isinstance(kw["text"], str):
+            kw["text"] = _bidi(kw["text"])
+        _orig_ttk_label_init(self, master, **kw)
+    ttk.Label.__init__ = _ttk_label_init
+
+    # ── tk.Text.insert (activity log uses scrolledtext / tk.Text) ─
+    _orig_text_insert = tk.Text.insert
+    def _text_insert(self, index, chars, *args):
+        if isinstance(chars, str):
+            chars = _bidi(chars)
+        return _orig_text_insert(self, index, chars, *args)
+    tk.Text.insert = _text_insert
+
+    # ── ttk.Treeview: profile names and detail strings ───────────
+    _orig_tree_insert = ttk.Treeview.insert
+    def _tree_insert(self, parent, index, iid=None, **kw):
+        if "text" in kw and isinstance(kw["text"], str):
+            kw["text"] = _bidi(kw["text"])
+        if "values" in kw:
+            kw["values"] = tuple(
+                _bidi(v) if isinstance(v, str) else v for v in kw["values"])
+        return _orig_tree_insert(self, parent, index, iid=iid, **kw)
+    ttk.Treeview.insert = _tree_insert
+
+    _orig_tree_item = ttk.Treeview.item
+    def _tree_item_patch(self, item, option=None, **kw):
+        if "text" in kw and isinstance(kw["text"], str):
+            kw["text"] = _bidi(kw["text"])
+        if "values" in kw:
+            kw["values"] = tuple(
+                _bidi(v) if isinstance(v, str) else v for v in kw["values"])
+        return _orig_tree_item(self, item, option, **kw)
+    ttk.Treeview.item = _tree_item_patch
+
+    # ── messagebox: all alert / confirm dialogs ──────────────────
+    import tkinter.messagebox as _tkm
+    for _mb_fn in ("showinfo", "showwarning", "showerror",
+                   "askokcancel", "askyesno", "askretrycancel", "askquestion"):
+        _mb_orig = getattr(_tkm, _mb_fn, None)
+        if _mb_orig:
+            def _make_mb_wrapper(_orig):
+                def _wrapper(title=None, message=None, **kw):
+                    return _orig(
+                        _bidi(title)   if isinstance(title,   str) else title,
+                        _bidi(message) if isinstance(message, str) else message,
+                        **kw)
+                return _wrapper
+            setattr(_tkm, _mb_fn, _make_mb_wrapper(_mb_orig))
+
+    # ── simpledialog.askstring: rename / duplicate dialogs ───────
+    import tkinter.simpledialog as _tksd
+    _sd_orig = _tksd.askstring
+    def _sd_askstring(title=None, prompt=None, **kw):
+        return _sd_orig(
+            _bidi(title)  if isinstance(title,  str) else title,
+            _bidi(prompt) if isinstance(prompt, str) else prompt,
+            **kw)
+    _tksd.askstring = _sd_askstring
+
 # ═══════════════════════════════════════════════════════════════
 #  DESIGN TOKENS — warm, modern, user-friendly palette
 # ═══════════════════════════════════════════════════════════════

@@ -49,12 +49,22 @@ jobs:
             Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $asset.name
             Write-Host "OK: $($asset.name)"
           } else { Write-Host "vaydns windows binary not found in latest release" }
+      - name: Download Vazirmatn font (Persian support)
+        shell: pwsh
+        run: |
+          try {
+            Invoke-WebRequest -Uri "https://github.com/rastikerdar/vazirmatn/releases/latest/download/Vazirmatn-fonts.zip" -OutFile "vazirmatn.zip"
+            Expand-Archive -Path "vazirmatn.zip" -DestinationPath "vazirmatn/" -Force
+            $font = Get-ChildItem -Path "vazirmatn/" -Recurse -Filter "Vazirmatn-Regular.ttf" | Select-Object -First 1
+            if ($font) { Copy-Item $font.FullName "Vazirmatn-Regular.ttf"; Write-Host "Font ready: Vazirmatn-Regular.ttf" }
+          } catch { Write-Host "WARNING: Vazirmatn font download failed: $_" }
       - name: Build EXE
         shell: pwsh
         run: |
           $addData = ""
           if (Test-Path "MasterDnsVPN.exe") { $addData += ' --add-data "MasterDnsVPN.exe;."' }
           if (Test-Path "MasterDnsVPN")     { $addData += ' --add-data "MasterDnsVPN;."' }
+          if (Test-Path "Vazirmatn-Regular.ttf") { $addData += ' --add-data "Vazirmatn-Regular.ttf;."' }
           # Bundle only Windows binaries (.exe) — never darwin/linux binaries
           Get-ChildItem -Filter "vaydns-client*.exe" | ForEach-Object {
             $addData += " --add-data `"$($_.Name);.`""
@@ -105,12 +115,22 @@ jobs:
             Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $asset.name
             Write-Host "Downloaded: $($asset.name)"
           } else { Write-Host "vaydns windows/arm64 not found" }
+      - name: Download Vazirmatn font (Persian support)
+        shell: pwsh
+        run: |
+          try {
+            Invoke-WebRequest -Uri "https://github.com/rastikerdar/vazirmatn/releases/latest/download/Vazirmatn-fonts.zip" -OutFile "vazirmatn.zip"
+            Expand-Archive -Path "vazirmatn.zip" -DestinationPath "vazirmatn/" -Force
+            $font = Get-ChildItem -Path "vazirmatn/" -Recurse -Filter "Vazirmatn-Regular.ttf" | Select-Object -First 1
+            if ($font) { Copy-Item $font.FullName "Vazirmatn-Regular.ttf"; Write-Host "Font ready: Vazirmatn-Regular.ttf" }
+          } catch { Write-Host "WARNING: Vazirmatn font download failed: $_" }
       - name: Build EXE
         shell: pwsh
         run: |
           $addData = ""
           if (Test-Path "MasterDnsVPN.exe") { $addData += ' --add-data "MasterDnsVPN.exe;."' }
           if (Test-Path "MasterDnsVPN")     { $addData += ' --add-data "MasterDnsVPN;."' }
+          if (Test-Path "Vazirmatn-Regular.ttf") { $addData += ' --add-data "Vazirmatn-Regular.ttf;."' }
           Get-ChildItem -Filter "vaydns-client*.exe" | ForEach-Object { $addData += " --add-data `"$($_.Name);.`"" }
           Invoke-Expression "python -m PyInstaller --onefile --windowed --name KevinNet_Windows_ARM64 --clean$addData kevinnet.py"
       - uses: actions/upload-artifact@v4

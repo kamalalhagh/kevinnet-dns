@@ -183,6 +183,10 @@ Click **▶ Start Scan**. Three automatic phases:
 
 A profile is saved with sensible defaults. The VPN binary is copied into the output folder automatically.
 
+### (Optional) Export DNS List
+
+After any scan, the **📤 Export DNS List** button becomes active regardless of which VPN mode you used. Click it to save the found resolver IPs as a plain `.txt` file — one IP per line. Useful if you want to use the resolver list in another application or script.
+
 ### Step 6  Connect from the Profiles tab
 
 Click **📋 MasterDNS Profiles** or **📋 VayDNS Profiles** at the top.
@@ -309,6 +313,9 @@ chmod +x KevinNet_Linux_x64
 
 **Windows: antivirus blocks the app**
 This is a false positive  PyInstaller-compiled apps trigger some antivirus scanners. Add an exception for the file, or build from source yourself (see BUILD_INSTRUCTIONS.txt).
+
+**Windows: Persian text appears as separate unjoined characters**
+v3.1.2+ bundles Vazirmatn and loads it automatically on startup. If you are on an older version, upgrade to the latest release from the [releases page](https://github.com/kamalalhagh/kevinnet-dns/releases/latest).
 
 ---
 

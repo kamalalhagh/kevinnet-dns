@@ -3400,6 +3400,24 @@ if sys.platform == "linux":
     except Exception:
         pass
 
+# ── Windows: register bundled Vazirmatn into GDI before Tk initialises ───
+if sys.platform == "win32":
+    def _install_bundled_font_windows() -> None:
+        import ctypes
+        search = [app_dir()]
+        if getattr(sys, "frozen", False):
+            search.append(Path(getattr(sys, "_MEIPASS", "")))
+        for base in search:
+            src = base / "Vazirmatn-Regular.ttf"
+            if src.exists():
+                # FR_PRIVATE (0x10): visible only to this process, auto-cleaned on exit
+                ctypes.windll.gdi32.AddFontResourceExW(str(src), 0x10, 0)
+                break
+    try:
+        _install_bundled_font_windows()
+    except Exception:
+        pass
+
 # Tkinter on Windows AND Linux does not auto-join Arabic/Persian characters
 # or reorder RTL text. Fix: use arabic_reshaper + python-bidi to both
 # reshape (join characters) and reorder (RTL display) Persian strings.
@@ -4524,6 +4542,9 @@ class App(tk.Tk):
                             self._W["btn_save"].config(state="normal", bg=BLUE, fg="#000000", disabledforeground=DIS_FG)
                         else:
                             self._W["btn_vd_save"].config(state="normal", bg=PURPLE, fg=BTN_TEXT, disabledforeground=DIS_FG)
+                    if self._found_ips:
+                        self._W["btn_export"].config(state="normal", bg=WARN, fg=BTN_TEXT,
+                                                     cursor="hand2", disabledforeground=DIS_FG)
                     n = len(verified)
                     self._W["badge"].config(
                         text=f"{n}  {'تأیید E2E' if fa else 'E2E verified'}")
@@ -5949,6 +5970,7 @@ class App(tk.Tk):
         # Show only the MasterDNS save button initially
         W["btn_vd_save"].pack_forget()
 
+        mk_btn("btn_export",  "📤  Export DNS List", "📤  خروجی لیست DNS", WARN, BTN_TEXT, self._export_dns, "disabled")
         mk_btn("btn_clear",   "🗑  Clear",  "🗑  پاک کردن", BORDER, CLEAR_FG, self._clear)
 
     # ── RIGHT PANEL ─────────────────────────────────────────────
@@ -6098,6 +6120,7 @@ class App(tk.Tk):
             ("btn_stop",    "■  توقف",                "■  Stop"),
             ("btn_save",    "💾  ذخیره در MasterDNS", "💾  Save to MasterDNS Profiles"),
             ("btn_vd_save", "💾  ذخیره در VayDNS",    "💾  Save to VayDNS Profiles"),
+            ("btn_export",  "📤  خروجی لیست DNS",     "📤  Export DNS List"),
             ("vd_key_lbl",  "کلید عمومی VayDNS",      "VayDNS Public Key"),
             ("pill_master", "MasterDNS",               "MasterDNS"),
             ("pill_vaydns", "VayDNS",                  "VayDNS"),
@@ -6395,9 +6418,41 @@ class App(tk.Tk):
         self._W["status_lbl"].config(text="● Ready", fg=GREEN)
         self._W["btn_save"].config(state="disabled",    bg="#1a2a4a")
         self._W["btn_vd_save"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
+        self._W["btn_export"].config(state="disabled",  bg=DIS_BG, fg=DIS_FG, cursor="arrow", disabledforeground=DIS_FG)
         self._W["btn_scan"].config(state="normal",       bg=ACCENT)
         self._W["btn_stop"].config(state="disabled",     bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
         self._saved_folder = None
+
+    def _export_dns(self):
+        """Export the scanned DNS resolver list to a plain-text file."""
+        fa = self._lang == "fa"
+        if not self._found_ips:
+            messagebox.showinfo(
+                "KevinNet DNS",
+                "هیچ نتیجه‌ای برای خروجی وجود ندارد." if fa else "No DNS results to export.",
+                parent=self)
+            return
+        from tkinter import filedialog
+        path = filedialog.asksaveasfilename(
+            parent=self,
+            title="ذخیره لیست DNS" if fa else "Export DNS List",
+            defaultextension=".txt",
+            filetypes=[("Text files", "*.txt"), ("All files", "*.*")],
+            initialfile="dns_resolvers.txt")
+        if not path:
+            return
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write("# KevinNet DNS — Scanned Resolvers\n")
+                f.write(f"# {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"# Total: {len(self._found_ips)}\n\n")
+                f.write("\n".join(self._found_ips) + "\n")
+            messagebox.showinfo(
+                "KevinNet DNS",
+                f"{'خروجی ذخیره شد:' if fa else 'Exported successfully:'}\n{path}",
+                parent=self)
+        except Exception as e:
+            messagebox.showerror("KevinNet DNS", str(e), parent=self)
 
     def _save_vaydns_profile(self):
         """Save a VayDNS profile from the current scan results."""

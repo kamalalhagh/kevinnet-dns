@@ -11,6 +11,40 @@ version.
 
 ---
 
+## [3.3.2] — 2026-05-22
+
+### Added
+
+- **DoH/DoT results are now saveable as VayDNS profiles.** After running
+  the 🔒 Scan DoH/DoT button, the existing **💾 Save to VayDNS Profiles**
+  button becomes active. Clicking it creates one VayDNS profile per
+  transport found — for example, if 12 DoH and 8 DoT endpoints were
+  reachable, you get an `<Country>-DoH` profile and an `<Country>-DoT`
+  profile, each with all the working endpoints baked in and the
+  transport flag pre-set. The save flow uses the same Domain and Pubkey
+  fields as the regular VayDNS UDP scan — no extra dialogs.
+- Helpful "Click 💾 Save to VayDNS Profiles" hint logged after a
+  successful DoH/DoT scan, so the next step is discoverable.
+
+### Changed
+
+- **VayDNS launch script (`run.sh` / `run.bat`) now supports multi-endpoint
+  fallthrough for DoH and DoT, not only for UDP.** Previously the DoH/DoT
+  path only honoured the legacy `custom_resolver` option, ignoring any
+  endpoint list in the profile — which meant the new save-from-scan
+  flow would have written a profile that didn't actually launch
+  correctly. Now any 2+ endpoints get the same `RESOLVERS=( ... )` loop
+  with timeout-and-move-on behaviour that UDP profiles use.
+- Profiles loaded by older releases (which only had `custom_resolver`
+  and an empty `resolvers` list) continue to work unchanged.
+
+### Fixed
+
+- The "Save to VayDNS Profiles" button stayed disabled after a
+  successful DoH/DoT scan even though valid endpoints were available.
+
+---
+
 ## [3.3.1] — 2026-05-22
 
 ### Fixed

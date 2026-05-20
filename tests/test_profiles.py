@@ -181,3 +181,111 @@ class TestProfileFilename:
 
     def test_prefix_applied(self, kn):
         assert kn._profile_filename("X", prefix="vd_").startswith("vd_X_")
+
+
+class TestVayDNSLaunchScriptDoH:
+    """Tests for v3.3.2: DoH/DoT profiles with multiple endpoints should
+    generate a fallthrough launch script the same way UDP does, instead
+    of silently using only the custom_resolver field.
+    """
+
+    def test_doh_profile_with_multiple_endpoints_uses_loop(self, kn, tmp_path, monkeypatch):
+        # Redirect output folder to a temp dir so we don't pollute the repo
+        monkeypatch.setattr(kn, "app_dir", lambda: tmp_path)
+
+        profile = {
+            "name":    "Iran-DoH",
+            "domain":  "t.example.com",
+            "pubkey":  "ab" * 32,
+            "country": "Iran-DoH",
+            "resolvers": [
+                "https://1.1.1.1/dns-query",
+                "https://8.8.8.8/dns-query",
+                "https://dns.google/dns-query",
+            ],
+            "options": {"transport": "doh"},
+        }
+        script = kn.write_vaydns_launch_script(profile)
+        body = script.read_text()
+        # Multi-endpoint script must use the RESOLVERS=( ... ) loop pattern
+        assert "RESOLVERS=(" in body
+        # All three endpoints present
+        assert "https://1.1.1.1/dns-query" in body
+        assert "https://8.8.8.8/dns-query" in body
+        assert "https://dns.google/dns-query" in body
+        # The transport flag should be -doh, never -udp
+        assert "-doh" in body
+        assert "-udp http" not in body  # paranoia: no UDP flag with HTTP URLs
+
+    def test_dot_profile_with_multiple_endpoints_uses_loop(self, kn, tmp_path, monkeypatch):
+        monkeypatch.setattr(kn, "app_dir", lambda: tmp_path)
+
+        profile = {
+            "name":    "Iran-DoT",
+            "domain":  "t.example.com",
+            "pubkey":  "ab" * 32,
+            "country": "Iran-DoT",
+            "resolvers": ["1.1.1.1:853", "8.8.8.8:853", "9.9.9.9:853"],
+            "options": {"transport": "dot"},
+        }
+        script = kn.write_vaydns_launch_script(profile)
+        body = script.read_text()
+        assert "RESOLVERS=(" in body
+        assert "1.1.1.1:853" in body
+        assert "9.9.9.9:853" in body
+        assert "-dot" in body
+
+    def test_doh_profile_with_single_endpoint_runs_directly(self, kn, tmp_path, monkeypatch):
+        monkeypatch.setattr(kn, "app_dir", lambda: tmp_path)
+        profile = {
+            "name":    "Iran-DoH",
+            "domain":  "t.example.com",
+            "pubkey":  "ab" * 32,
+            "country": "Iran-DoH-single",
+            "resolvers": ["https://1.1.1.1/dns-query"],
+            "options": {"transport": "doh"},
+        }
+        script = kn.write_vaydns_launch_script(profile)
+        body = script.read_text()
+        # Single endpoint should NOT use the fallthrough loop
+        assert "RESOLVERS=(" not in body
+        # Still uses DoH transport flag
+        assert "-doh https://1.1.1.1/dns-query" in body
+
+    def test_doh_profile_with_no_endpoints_prints_error(self, kn, tmp_path, monkeypatch):
+        # Edge case: empty resolvers list and no custom_resolver — the
+        # launch script must emit a clear error message, not silently
+        # produce a half-broken vaydns-client invocation.
+        monkeypatch.setattr(kn, "app_dir", lambda: tmp_path)
+        profile = {
+            "name":    "Empty",
+            "domain":  "t.example.com",
+            "pubkey":  "ab" * 32,
+            "country": "Empty-DoH",
+            "resolvers": [],
+            "options": {"transport": "doh"},
+        }
+        script = kn.write_vaydns_launch_script(profile)
+        body = script.read_text()
+        assert "ERROR" in body
+        assert "doh" in body.lower()
+
+    def test_custom_resolver_still_works_for_doh(self, kn, tmp_path, monkeypatch):
+        # Backwards compatibility: profiles saved before v3.3.2 only had
+        # custom_resolver and no resolvers list. They must still work.
+        monkeypatch.setattr(kn, "app_dir", lambda: tmp_path)
+        profile = {
+            "name":    "Old-DoH",
+            "domain":  "t.example.com",
+            "pubkey":  "ab" * 32,
+            "country": "Old-DoH",
+            "resolvers": [],
+            "options": {
+                "transport":       "doh",
+                "custom_resolver": "https://9.9.9.9/dns-query",
+            },
+        }
+        script = kn.write_vaydns_launch_script(profile)
+        body = script.read_text()
+        assert "https://9.9.9.9/dns-query" in body
+        assert "-doh" in body

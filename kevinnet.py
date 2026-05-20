@@ -8,7 +8,7 @@ import asyncio, os, queue, random, sys, threading, time
 from datetime import datetime
 from pathlib import Path
 
-__version__ = "3.3.1"
+__version__ = "3.3.2"
 
 # ── Embedded app icon (base64 PNG, 256x256) ────────────────────
 ICON_B64 = (
@@ -4817,8 +4817,15 @@ def write_vaydns_launch_script(profile: dict) -> Path:
                 for r in resolvers
             ] or ["8.8.8.8:53"]
     else:
-        # DoH / DoT: user must provide resolver URL or address in options
-        resolver_addrs = [custom_resolver] if custom_resolver else [""]
+        # DoH / DoT: if the profile has scanned endpoints, use those (newer
+        # flow from the 🔒 Scan DoH/DoT button). Otherwise fall back to the
+        # legacy custom_resolver field on the Options tab.
+        if resolvers:
+            resolver_addrs = list(resolvers)
+        elif custom_resolver:
+            resolver_addrs = [custom_resolver]
+        else:
+            resolver_addrs = [""]
 
     # Now create folder and copy binary
     folder.mkdir(parents=True, exist_ok=True)
@@ -4872,15 +4879,23 @@ def write_vaydns_launch_script(profile: dict) -> Path:
             "trap cleanup INT TERM",
             "",
         ]
-        if transport == "udp":
-            if len(resolver_addrs) == 1:
+        # The fallthrough loop is transport-agnostic — build_vaydns_command
+        # picks the right -udp/-doh/-dot flag from profile["options"]["transport"].
+        # Use the multi-resolver loop whenever we have 2+ endpoints, regardless
+        # of transport. Single-endpoint case takes a simpler direct-run path.
+        if transport in ("udp", "doh", "dot"):
+            # Reject empty resolver list early — happens if no scan was run
+            # and no custom_resolver was set for DoH/DoT.
+            if not resolver_addrs or resolver_addrs == [""]:
+                lines += [f'echo "ERROR: no {transport} resolver configured — run a scan or set custom_resolver in the VayDNS Profiles tab"']
+            elif len(resolver_addrs) == 1:
                 # Single resolver — run directly, let vaydns-client handle retries
                 lines += [
-                    f'echo "[vaydns] using resolver: {resolver_addrs[0]}"',
+                    f'echo "[vaydns] using {transport.upper()} resolver: {resolver_addrs[0]}"',
                     build_vaydns_command(profile, resolver_addrs[0], sh_bin_name),
                 ]
             else:
-                # Multiple scanned resolvers.
+                # Multiple resolvers — fall through on failure or timeout.
                 # vaydns-client NEVER exits on its own — it retries the same resolver
                 # forever with exponential back-off. We run each as a background
                 # process and kill it after RESOLVER_TIMEOUT seconds if it hasn't
@@ -4894,7 +4909,7 @@ def write_vaydns_launch_script(profile: dict) -> Path:
                     f"RESOLVER_TIMEOUT={opts.get('resolver_timeout', 60)}",
                     "",
                     'for RESOLVER in "${RESOLVERS[@]}"; do',
-                    '  echo "[vaydns] ▶ trying resolver: $RESOLVER  (timeout: ${RESOLVER_TIMEOUT}s)"',
+                    f'  echo "[vaydns] ▶ trying {transport.upper()} resolver: $RESOLVER  (timeout: ${{RESOLVER_TIMEOUT}}s)"',
                     "",
                     f"  {build_vaydns_command(profile, '"$RESOLVER"', sh_bin_name)} &",
                     "  VD_PID=$!",
@@ -4926,12 +4941,8 @@ def write_vaydns_launch_script(profile: dict) -> Path:
                     "exit 1",
                 ]
         else:
-            # DoH or DoT — single resolver address, run directly
-            addr = resolver_addrs[0] if resolver_addrs[0] else ""
-            if not addr:
-                lines += [f'echo "ERROR: set a resolver address in the VayDNS Profiles tab for {transport} transport"']
-            else:
-                lines += [build_vaydns_command(profile, addr, sh_bin_name)]
+            # Unknown transport — defensive fallback
+            lines += [f'echo "ERROR: unknown transport: {transport}"']
 
         script_path = folder / "run.sh"
         script_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -4946,33 +4957,31 @@ def write_vaydns_launch_script(profile: dict) -> Path:
         f"REM Transport: {transport}",
         "",
     ]
-    if transport == "udp":
-        if len(resolver_addrs) == 1:
-            lines.append(f"echo Using resolver: {resolver_addrs[0]}")
+    if transport in ("udp", "doh", "dot"):
+        if not resolver_addrs or resolver_addrs == [""]:
+            lines.append(f"echo ERROR: no {transport} resolver configured - run a scan or set custom_resolver")
+        elif len(resolver_addrs) == 1:
+            lines.append(f"echo Using {transport.upper()} resolver: {resolver_addrs[0]}")
             lines.append(build_vaydns_command(profile, resolver_addrs[0], bat_bin_name))
         else:
-            # Windows: start each in a new window with a timeout via WMIC or timeout command
-            # Simplest portable approach: run sequentially, vaydns exits non-zero on failure
+            # Windows: run sequentially, vaydns exits non-zero on failure.
             # The user can re-run the script to try the next resolver.
-            # For a proper fallthrough, PowerShell would be needed — use run.ps1 instead.
+            # Same loop shape for any transport — build_vaydns_command picks
+            # the right -udp/-doh/-dot flag based on profile options.
             lines += [
                 f"SET RESOLVER_TIMEOUT={opts.get('resolver_timeout', 60)}",
                 "",
             ]
             for i, r in enumerate(resolver_addrs):
                 lines += [
-                    f"echo [vaydns] trying resolver {i+1}/{len(resolver_addrs)}: {r}",
+                    f"echo [vaydns] trying {transport.upper()} resolver {i+1}/{len(resolver_addrs)}: {r}",
                     f"start /B /WAIT {build_vaydns_command(profile, r, bat_bin_name)}",
                     "if %ERRORLEVEL% == 0 goto :done",
                     f"echo [vaydns] resolver {r} failed, trying next...",
                 ]
             lines += ["echo [vaydns] all resolvers exhausted", "goto :eof", ":done"]
     else:
-        addr = resolver_addrs[0] if resolver_addrs[0] else ""
-        if addr:
-            lines.append(build_vaydns_command(profile, addr, bat_bin_name))
-        else:
-            lines.append(f"echo ERROR: set a resolver address for {transport} transport")
+        lines.append(f"echo ERROR: unknown transport: {transport}")
     lines += ["pause"]
     script_path = folder / "run.bat"
     script_path.write_text("\r\n".join(lines) + "\r\n", encoding="utf-8")
@@ -5081,6 +5090,11 @@ class App(tk.Tk):
 
         self._lang      = "fa"
         self._found_ips : list[str] = []
+        # DoH/DoT scan results — kept separate from _found_ips (which is
+        # UDP IP addresses) because they need a different transport flag
+        # at launch time. Save logic creates one profile per transport found.
+        self._doh_found : list[str] = []
+        self._dot_found : list[str] = []
         self._stop_ev   = threading.Event()
         self._scanning  = False
         self._W         : dict = {}
@@ -5230,6 +5244,7 @@ class App(tk.Tk):
                 elif kind == "doh_res":
                     # DoH endpoint responded — show as a teal row with a 🔒 icon
                     _, endpoint, ms = item
+                    self._doh_found.append(endpoint)
                     self._W["tree"].insert(
                         "", "end",
                         values=(endpoint, "DoH", f"{ms:.0f}", "🔒 reachable"),
@@ -5238,6 +5253,7 @@ class App(tk.Tk):
                     self._log(f"🔒  DoH  {endpoint}  {ms:.0f}ms")
                 elif kind == "dot_res":
                     _, endpoint, ms = item
+                    self._dot_found.append(endpoint)
                     self._W["tree"].insert(
                         "", "end",
                         values=(endpoint, "DoT", f"{ms:.0f}", "🔒 reachable"),
@@ -5257,6 +5273,12 @@ class App(tk.Tk):
                     self._W["btn_stop"].config(
                         state="disabled", bg=DIS_BG, fg=DIS_FG,
                         disabledforeground=DIS_FG)
+                    # Enable Save VayDNS button if any DoH/DoT endpoints worked,
+                    # so user can save them straight into a VayDNS profile.
+                    if self._doh_found or self._dot_found:
+                        self._W["btn_vd_save"].config(
+                            state="normal", bg=PURPLE, fg=BTN_TEXT,
+                            disabledforeground=DIS_FG)
                     self._W["status_lbl"].config(
                         text=f"● {'DoH/DoT کامل' if fa else 'DoH/DoT done'}"
                              f"  —  {found}/{tested} reachable",
@@ -5264,6 +5286,12 @@ class App(tk.Tk):
                     self._log(
                         f"{'✓ DoH/DoT کامل:' if fa else '✓ DoH/DoT done:'} "
                         f"{found}/{tested} reachable")
+                    # Hint the user about what to do next
+                    if self._doh_found or self._dot_found:
+                        self._log(
+                            "💡 " + ("روی «💾 ذخیره در VayDNS Profiles» کلیک کنید تا یک پروفایل ساخته شود"
+                                     if fa else
+                                     "Click 💾 Save to VayDNS Profiles to create a profile from these endpoints"))
 
         except queue.Empty:
             pass
@@ -6492,6 +6520,8 @@ class App(tk.Tk):
 
         # Reset scan state whenever mode changes
         self._found_ips.clear()
+        self._doh_found.clear()
+        self._dot_found.clear()
         for row in self._W.get("tree", tk.Frame()).winfo_children():
             try: row.destroy()
             except Exception: pass
@@ -6983,6 +7013,8 @@ class App(tk.Tk):
 
         # Reset UI
         self._found_ips.clear()
+        self._doh_found.clear()
+        self._dot_found.clear()
         self._auto_saved_stem = None
         for row in self._W["tree"].get_children():
             self._W["tree"].delete(row)
@@ -7210,6 +7242,9 @@ class App(tk.Tk):
         # Reset visible state
         for row in self._W["tree"].get_children():
             self._W["tree"].delete(row)
+        # Clear previous DoH/DoT results so each scan starts fresh
+        self._doh_found.clear()
+        self._dot_found.clear()
         self._W["progress"]["value"] = 0
         self._stop_ev.clear()
         self._scanning = True
@@ -7276,6 +7311,8 @@ class App(tk.Tk):
     def _clear(self):
         self._stop_ev.set()
         self._found_ips.clear()
+        self._doh_found.clear()
+        self._dot_found.clear()
         for row in self._W["tree"].get_children():
             self._W["tree"].delete(row)
         log = self._W["log"]
@@ -7390,16 +7427,31 @@ class App(tk.Tk):
             messagebox.showerror("KevinNet DNS", str(e), parent=self)
 
     def _save_vaydns_profile(self):
-        """Save a VayDNS profile from the current scan results."""
-        if not self._found_ips:
-            messagebox.showwarning("", "هیچ Resolver یافت نشد." if self._lang == "fa"
-                                   else "No resolvers found.")
-            return
+        """Save a VayDNS profile from the current scan results.
+
+        Three cases:
+          1. UDP scan results (_found_ips populated): save one UDP profile
+          2. DoH/DoT scan results (_doh_found / _dot_found populated): save
+             one profile per transport found, suffixed `-DoH` / `-DoT`
+          3. Mixed (rare — UDP scan then DoH scan without clearing):
+             prefer DoH/DoT if both kinds present, since the UDP results
+             would have already been saveable via the earlier auto-save.
+        """
+        fa = self._lang == "fa"
         domain  = self._domain_var.get().strip()
         pubkey  = (self._vd_pubkey_var.get() if self._vd_pubkey_var else "").strip().lower()
         country = self._country_var.get().strip()
-        fa      = self._lang == "fa"
 
+        # Determine which scan results to save
+        have_doh_dot = bool(self._doh_found or self._dot_found)
+        have_udp     = bool(self._found_ips)
+
+        if not (have_doh_dot or have_udp):
+            messagebox.showwarning(
+                "", "هیچ Resolver یافت نشد." if fa else "No resolvers found.")
+            return
+
+        # Same validation as UDP path — Domain and Pubkey required
         ok, err = validate_domain(domain)
         if not ok:
             messagebox.showwarning(
@@ -7417,7 +7469,60 @@ class App(tk.Tk):
                 "", ("نام پوشه نامعتبر است. " if fa else "Invalid folder name. ") + err)
             return
 
-        ts      = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+        # Branch 1: DoH/DoT — save one profile per transport found
+        if have_doh_dot:
+            saved_profiles = []  # list of (transport, script_path) for the summary dialog
+            for transport, endpoints, suffix in [
+                ("doh", list(self._doh_found), "-DoH"),
+                ("dot", list(self._dot_found), "-DoT"),
+            ]:
+                if not endpoints:
+                    continue
+                # Each transport gets its own profile + its own output folder
+                # (suffixed) so the two launch scripts don't clobber each other.
+                opts = dict(VAYDNS_DEFAULTS)
+                opts["transport"] = transport
+                profile = {
+                    "name":           f"{country}{suffix}",
+                    "date":           ts,
+                    "domain":         domain,
+                    "pubkey":         pubkey,
+                    "country":        f"{country}{suffix}",
+                    "resolver_count": len(endpoints),
+                    "resolvers":      endpoints,
+                    "options":        opts,
+                }
+                try:
+                    script = write_vaydns_launch_script(profile)
+                    save_new_vaydns_profile(profile)
+                    saved_profiles.append((transport.upper(), script))
+                except Exception as e:
+                    messagebox.showerror("", str(e))
+                    return
+
+            # Compose a summary
+            summary_lines = [
+                ("VayDNS پروفایل‌ها ذخیره شد:" if fa else "VayDNS profiles saved:"),
+                "",
+            ]
+            for transport, script in saved_profiles:
+                summary_lines.append(f"• {transport}: {script.parent.name}/{script.name}")
+            summary_lines += [
+                "",
+                ("برای اتصال به تب VayDNS Profiles بروید" if fa
+                 else "Go to VayDNS Profiles tab to launch"),
+            ]
+            count = len(saved_profiles)
+            self._log(
+                f"✓ {count} VayDNS "
+                f"{'پروفایل ذخیره شد' if fa else 'profile(s) saved'} "
+                f"({', '.join(t for t, _ in saved_profiles)})")
+            messagebox.showinfo("Saved", "\n".join(summary_lines))
+            return
+
+        # Branch 2: classic UDP scan — same behaviour as before
         profile = {
             "name":           country,
             "date":           ts,

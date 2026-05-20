@@ -11,6 +11,31 @@ version.
 
 ---
 
+## [3.3.1] — 2026-05-22
+
+### Fixed
+
+- **Scans found very few resolvers when running from source without a
+  `data/` folder next to `kevinnet.py`** — and the DoH/DoT button
+  reported "no endpoints configured" for the same reason. The 3.3.0
+  release introduced external `data/*.txt` files but only kept a
+  five-IP fallback for the embedded constants, which meant the app
+  degraded to a near-empty scan list when those files weren't found.
+- **DoH and DoT endpoint lists** had no embedded fallback at all, so
+  `get_doh_endpoints()` and `get_dot_endpoints()` returned an empty
+  list whenever the `data/` folder wasn't present.
+
+### Changed
+
+- **Embedded data lists are now the full lists, not stubs.** The app
+  ships with the complete resolver, CIDR, WhiteDNS, and DoH/DoT lists
+  baked into the Python source and works correctly out of the box
+  with no `data/` folder at all. External `data/*.txt` files still
+  take priority when present, so advanced users can still override
+  the bundled lists without rebuilding.
+
+---
+
 ## [3.3.0] — 2026-05-21
 
 ### Added

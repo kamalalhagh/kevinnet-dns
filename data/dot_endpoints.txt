@@ -1,0 +1,42 @@
+# DNS-over-TLS endpoints — host[:port] form. Default port is 853.
+# Tested by sending a real DNS query over TLS to the host.
+# One entry per line. Lines starting with # are ignored.
+# DoT runs on port 853 — sometimes blocked outright by Iranian DPI, but
+# when allowed it's faster than DoH because there is no HTTP overhead.
+# Last bundled snapshot: 2026-05.
+
+# Cloudflare
+1.1.1.1:853
+1.0.0.1:853
+one.one.one.one:853
+
+# Google
+8.8.8.8:853
+8.8.4.4:853
+dns.google:853
+
+# Quad9
+9.9.9.9:853
+149.112.112.112:853
+dns.quad9.net:853
+
+# AdGuard
+94.140.14.14:853
+dns.adguard-dns.com:853
+
+# Mullvad
+194.242.2.2:853
+dns.mullvad.net:853
+
+# CleanBrowsing
+185.228.168.9:853
+
+# DNS.SB
+185.222.222.222:853
+
+# CIRA Canadian Shield
+149.112.121.10:853
+
+# LibreDNS
+88.198.92.222:853
+dot.libredns.gr:853

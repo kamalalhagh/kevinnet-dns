@@ -49,6 +49,11 @@ echo ""
 COMMON_ARGS=(--onefile --clean)
 [ -f "MasterDnsVPN"     ] && COMMON_ARGS+=(--add-data "MasterDnsVPN:.")     && echo "  Bundling: MasterDnsVPN"
 [ -f "MasterDnsVPN.exe" ] && COMMON_ARGS+=(--add-data "MasterDnsVPN.exe:.") && echo "  Bundling: MasterDnsVPN.exe"
+# v3.3.0+: bundle data/ (resolvers, CIDRs, DoH/DoT endpoints).
+if [ -d "data" ]; then
+    COMMON_ARGS+=(--add-data "data:data")
+    echo "  Bundling: data/ ($(ls data | wc -l | tr -d ' ') files)"
+fi
 echo ""
 
 echo "[1/5] ARM venv + packages..."

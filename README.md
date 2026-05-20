@@ -25,6 +25,21 @@ Two VPN engines are supported:
 
 ---
 
+## ✨ What's New in 3.3.0
+
+- 🔒  **DoH / DoT scanning** — new button scans a curated list of well-known DNS-over-HTTPS (port 443) and DNS-over-TLS (port 853) endpoints. Because the traffic is TLS, it's much harder for Iranian DPI to fingerprint as tunnel traffic than plain UDP/53.
+- 🖱  **Right-click context menu** on the resolver list — Copy IP, Copy all IPs, Open output folder.
+- ⏱  **Last-launched indicator** on each profile (`launched 5m ago`, `launched 3h ago`). Easy to spot which profile is currently active.
+- 💾  **Remembers your last inputs** — domain, country folder, and VPN mode are restored on next launch.
+- ✅  **Input validation** with clear error messages — no more confusing "parse TOML failed" errors when a paste contained a stray character.
+- 🔐  **Security hardening** — profile files are created with restrictive permissions on Linux/macOS so other users can't read your encryption keys.
+- 🧪  **Test suite** with 87 tests runs in CI before every release build.
+- 📜  **SHA-256 checksums** published alongside every release so you can verify downloads.
+
+See [CHANGELOG.md](CHANGELOG.md) for the full list.
+
+---
+
 ## 📥 Download KevinNet
 
 Download the latest release from the [**Releases page**](../../releases/latest):
@@ -43,6 +58,19 @@ Download the latest release from the [**Releases page**](../../releases/latest):
 > ```
 
 > **Linux:** Run `chmod +x KevinNet_Linux_x64` before launching.
+
+### Verifying your download (optional but recommended)
+
+Every release ships with a `SHA256SUMS.txt` file alongside the binaries. To verify the file you downloaded hasn't been tampered with:
+
+```bash
+shasum -a 256 -c SHA256SUMS.txt     # macOS / Linux
+```
+```powershell
+Get-FileHash -Algorithm SHA256 KevinNet_Windows_x64.exe  # Windows
+```
+
+Compare the output against the line for your platform in `SHA256SUMS.txt`. If they don't match, do not run the file — re-download from the official Releases page.
 
 ---
 
@@ -187,11 +215,21 @@ A profile is saved with sensible defaults. The VPN binary is copied into the out
 
 After any scan, the **📤 Export DNS List** button becomes active regardless of which VPN mode you used. Click it to save the found resolver IPs as a plain `.txt` file — one IP per line. Useful if you want to use the resolver list in another application or script.
 
+### (Optional) DoH / DoT Scan — encrypted transports
+
+The **🔒 Scan DoH/DoT** button (new in 3.3.0) probes a curated list of well-known DNS-over-HTTPS (port 443) and DNS-over-TLS (port 853) endpoints. The traffic looks like normal HTTPS, so it's much harder for Iranian DPI to fingerprint as tunnel traffic than plain UDP/53. Working endpoints stream into the results list with a 🔒 icon — paste any of them into a VayDNS profile as a custom resolver when UDP isn't surviving DPI.
+
+The lists live in `data/doh_endpoints.txt` and `data/dot_endpoints.txt` next to the app. You can edit them to add private endpoints or remove dead ones without rebuilding.
+
+### Tip — right-click any resolver
+
+In the results list, right-click (or two-finger click / Ctrl-click on Mac) to **Copy IP**, **Copy all IPs**, or **Open output folder** in your file manager.
+
 ### Step 6  Connect from the Profiles tab
 
 Click **📋 MasterDNS Profiles** or **📋 VayDNS Profiles** at the top.
 
-1. Select your profile from the left list
+1. Select your profile from the left list  the **launched 5m ago** indicator helps you find your active profile
 2. Optionally edit options and click **💾 Save Changes**
 3. Click **🚀 Launch VPN**  a terminal opens and the VPN starts
 
@@ -454,7 +492,32 @@ KevinNet is a **client-side app only**. Server installation is covered in the of
 
 ## 🛠️ Build From Source
 
-See [BUILD_INSTRUCTIONS.txt](BUILD_INSTRUCTIONS.txt) (English) or [BUILD_INSTRUCTIONS_FA.txt](BUILD_INSTRUCTIONS_FA.txt) (فارسی).
+See [BUILD_INSTRUCTIONS.txt](BUILD_INSTRUCTIONS.txt) (English) or [BUILD_INSTRUCTIONS_FA.txt](BUILD_INSTRUCTIONS_FA.txt) (فارسی) for the full PyInstaller build steps.
+
+### Running the test suite
+
+KevinNet ships with a unit test suite (87 tests) covering input validation, scanner helpers, profile config building, and settings handling. Tests run in CI before every release.
+
+```bash
+pip install pytest dnspython pillow
+python -m pytest tests/ -v
+```
+
+All tests must pass before a release is built — the CI workflow gates the platform-specific builds behind a successful `pytest` run.
+
+### Editing bundled data lists
+
+The Iranian CIDR ranges, public DNS resolvers, WhiteDNS Iran list, and DoH/DoT endpoint lists live as plain text files in `data/`:
+
+| File | Contents |
+|---|---|
+| `data/iran_cidrs.txt` | Iranian IPv4 CIDR ranges sampled during scanning |
+| `data/public_resolvers.txt` | Well-known public DNS resolvers (warm-up set) |
+| `data/white_dns_iran.txt` | Pre-verified Iranian DNS resolvers (high-hit-rate seed list) |
+| `data/doh_endpoints.txt` | DNS-over-HTTPS endpoints scanned by the 🔒 button |
+| `data/dot_endpoints.txt` | DNS-over-TLS endpoints scanned by the 🔒 button |
+
+You can edit these files to add private endpoints or remove dead entries — no rebuild needed. When PyInstaller bundles the binary it copies them inside, and the app also looks for a `data/` folder next to the executable so user edits take priority over the bundled copy.
 
 ---
 
@@ -475,6 +538,8 @@ See [THIRD_PARTY_LICENSES.md](THIRD_PARTY_LICENSES.md) for full license texts.
 - **Report bugs** via GitHub Issues
 
 Every star and share helps this tool reach one more family that needs it.
+
+See [CHANGELOG.md](CHANGELOG.md) for what's new in each release.
 
 ---
 

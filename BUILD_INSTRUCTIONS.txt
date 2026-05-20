@@ -3,6 +3,42 @@
   by Kevin Haji | kevinhaji.com | kevin.fullstack.dev@gmail.com
 ================================================================================
 
+WHAT'S NEW IN 3.3.0 FOR BUILDERS
+--------------------------------------------------------------------------------
+Two things changed in how KevinNet is built  please read before continuing:
+
+  1. The "data/" folder is REQUIRED
+     The Iranian CIDR ranges, public resolvers, WhiteDNS list, and the new
+     DoH/DoT endpoint lists now live as plain text files under "data/" in
+     the project root. The bundled build scripts (build_linux.sh,
+     build_mac_universal.sh, build_windows.bat) already handle bundling
+     it via PyInstaller's --add-data flag  no action required if you
+     use the supplied scripts.
+
+     If you build manually with a custom pyinstaller command, you MUST
+     include the data folder, e.g.:
+
+       pyinstaller --onefile --add-data "data:data" kevinnet.py    # Linux/macOS
+       pyinstaller --onefile --add-data "data;data" kevinnet.py    # Windows
+
+     If the data folder is missing at runtime, KevinNet falls back to
+     a tiny embedded list (just enough to start the app) and the scans
+     will be much less effective.
+
+  2. Run the test suite before releasing
+     KevinNet now ships with a pytest suite (87 tests) covering input
+     validators, scanner helpers, and profile-config building. Run it
+     after any change to kevinnet.py:
+
+       pip install pytest dnspython pillow
+       python -m pytest tests/ -v
+
+     All tests must pass. The GitHub Actions workflow gates every
+     release build behind a successful pytest run, so a broken refactor
+     will never produce a release.
+
+================================================================================
+
 ACKNOWLEDGEMENT & CREDITS
 --------------------------------------------------------------------------------
 This app uses MasterDnsVPN as the underlying VPN client.

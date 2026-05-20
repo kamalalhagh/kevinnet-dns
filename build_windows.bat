@@ -32,6 +32,9 @@ echo [2/3] Building EXE...
 set ADD_DATA=
 if exist "MasterDnsVPN.exe" set ADD_DATA=%ADD_DATA% --add-data "MasterDnsVPN.exe;."
 if exist "MasterDnsVPN"     set ADD_DATA=%ADD_DATA% --add-data "MasterDnsVPN;."
+REM v3.3.0+: bundle the data folder (CIDRs, resolvers, DoH/DoT endpoints).
+REM Windows uses ; as the --add-data separator, unlike : on Unix.
+if exist "data" set ADD_DATA=%ADD_DATA% --add-data "data;data"
 
 python -m PyInstaller --onefile --windowed --name "KevinNet" --clean %ADD_DATA% "kevinnet.py"
 if errorlevel 1 ( echo [ERROR] Build failed. & pause & exit /b 1 )

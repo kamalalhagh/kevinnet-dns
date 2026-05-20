@@ -25,6 +25,7 @@ jobs:
           if (Test-Path "MasterDnsVPN.exe") { $addData += ' --add-data "MasterDnsVPN.exe;."' }
           if (Test-Path "MasterDnsVPN")     { $addData += ' --add-data "MasterDnsVPN;."' }
           if (Test-Path "vaydns-client_windows_amd64.exe") { $addData += ' --add-data "vaydns-client_windows_amd64.exe;."' }
+          if (Test-Path "data") { $addData += ' --add-data "data;data"' }
           $cmd = "python -m PyInstaller --onefile --windowed --name KevinNet_Windows_x64 --clean$addData kevinnet.py"
           Invoke-Expression $cmd
       - uses: actions/upload-artifact@v4
@@ -46,6 +47,7 @@ jobs:
         run: |
           ADD_DATA=""
           [ -f "MasterDnsVPN"               ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN:."
+          [ -d "data" ] && ADD_DATA="$ADD_DATA --add-data data:data"
           [ -f "vaydns-client-darwin-arm64" ] && ADD_DATA="$ADD_DATA --add-data vaydns-client-darwin-arm64:."
           .venv/bin/python -m PyInstaller \
             --onefile --name KevinNet_macOS_arm64 --clean \
@@ -76,6 +78,7 @@ jobs:
         run: |
           ADD_DATA=""
           [ -f "MasterDnsVPN"               ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN:."
+          [ -d "data" ] && ADD_DATA="$ADD_DATA --add-data data:data"
           [ -f "vaydns-client-darwin-amd64" ] && ADD_DATA="$ADD_DATA --add-data vaydns-client-darwin-amd64:."
           arch -x86_64 .venv_x86/bin/python -m PyInstaller \
             --onefile --name KevinNet_macOS_Intel --clean \
@@ -130,6 +133,7 @@ jobs:
         run: |
           ADD_DATA=""
           [ -f "MasterDnsVPN"              ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN:."
+          [ -d "data" ] && ADD_DATA="$ADD_DATA --add-data data:data"
           [ -f "vaydns-client-linux-amd64" ] && ADD_DATA="$ADD_DATA --add-data vaydns-client-linux-amd64:."
           python -m PyInstaller \
             --onefile --windowed \
@@ -156,6 +160,7 @@ jobs:
         run: |
           ADD_DATA=""
           [ -f "MasterDnsVPN"              ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN:."
+          [ -d "data" ] && ADD_DATA="$ADD_DATA --add-data data:data"
           [ -f "vaydns-client-linux-arm64" ] && ADD_DATA="$ADD_DATA --add-data vaydns-client-linux-arm64:."
           python -m PyInstaller \
             --onefile --windowed \

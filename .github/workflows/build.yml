@@ -8,8 +8,29 @@ on:
 
 jobs:
 
+  # ── Unit tests (gates every release build) ───────────────────
+  # Runs the pure-function pytest suite before any platform build.
+  # If anything here fails, no release artifacts are produced — much
+  # safer than discovering a broken refactor after the binaries ship.
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-tk
+          python -m pip install --upgrade pip
+          python -m pip install pytest dnspython pillow arabic-reshaper python-bidi
+      - name: Run pytest
+        run: python -m pytest tests/ -v
+
   # ── Windows x64 ──────────────────────────────────────────────
   windows-x64:
+    needs: test
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -65,6 +86,8 @@ jobs:
           if (Test-Path "MasterDnsVPN.exe") { $addData += ' --add-data "MasterDnsVPN.exe;."' }
           if (Test-Path "MasterDnsVPN")     { $addData += ' --add-data "MasterDnsVPN;."' }
           if (Test-Path "Vazirmatn-Regular.ttf") { $addData += ' --add-data "Vazirmatn-Regular.ttf;."' }
+          # v3.3.0: bundle data/ folder with resolver, CIDR, DoH/DoT lists
+          if (Test-Path "data") { $addData += ' --add-data "data;data"' }
           # Bundle only Windows binaries (.exe) — never darwin/linux binaries
           Get-ChildItem -Filter "vaydns-client*.exe" | ForEach-Object {
             $addData += " --add-data `"$($_.Name);.`""
@@ -78,6 +101,7 @@ jobs:
 
   # ── Windows ARM64 ────────────────────────────────────────────
   windows-arm64:
+    needs: test
     runs-on: windows-11-arm
     steps:
       - uses: actions/checkout@v4
@@ -131,6 +155,8 @@ jobs:
           if (Test-Path "MasterDnsVPN.exe") { $addData += ' --add-data "MasterDnsVPN.exe;."' }
           if (Test-Path "MasterDnsVPN")     { $addData += ' --add-data "MasterDnsVPN;."' }
           if (Test-Path "Vazirmatn-Regular.ttf") { $addData += ' --add-data "Vazirmatn-Regular.ttf;."' }
+          # v3.3.0: bundle data/ folder with resolver, CIDR, DoH/DoT lists
+          if (Test-Path "data") { $addData += ' --add-data "data;data"' }
           Get-ChildItem -Filter "vaydns-client*.exe" | ForEach-Object { $addData += " --add-data `"$($_.Name);.`"" }
           Invoke-Expression "python -m PyInstaller --onefile --windowed --name KevinNet_Windows_ARM64 --clean$addData kevinnet.py"
       - uses: actions/upload-artifact@v4
@@ -140,6 +166,7 @@ jobs:
 
   # ── macOS Apple Silicon (arm64) ───────────────────────────────
   macos-arm64:
+    needs: test
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -181,6 +208,7 @@ jobs:
 
   # ── macOS Intel (x86_64) ─────────────────────────────────────
   macos-intel:
+    needs: test
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
@@ -256,6 +284,7 @@ jobs:
 
   # ── Linux x64 ────────────────────────────────────────────────
   linux-x64:
+    needs: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -300,6 +329,8 @@ jobs:
           ADD_DATA=""
           [ -f "MasterDnsVPN" ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN:."
           [ -f "Vazirmatn-Regular.ttf" ] && ADD_DATA="$ADD_DATA --add-data Vazirmatn-Regular.ttf:."
+          # v3.3.0: bundle data/ folder with resolver, CIDR, DoH/DoT lists
+          [ -d "data" ] && ADD_DATA="$ADD_DATA --add-data data:data"
           for f in vaydns-client*linux*amd64*; do
             [ -f "$f" ] && ADD_DATA="$ADD_DATA --add-data $f:." && echo "Bundling: $f"
           done
@@ -311,6 +342,7 @@ jobs:
 
   # ── Linux ARM64 ──────────────────────────────────────────────
   linux-arm64:
+    needs: test
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v4
@@ -355,6 +387,8 @@ jobs:
           ADD_DATA=""
           [ -f "MasterDnsVPN" ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN:."
           [ -f "Vazirmatn-Regular.ttf" ] && ADD_DATA="$ADD_DATA --add-data Vazirmatn-Regular.ttf:."
+          # v3.3.0: bundle data/ folder with resolver, CIDR, DoH/DoT lists
+          [ -d "data" ] && ADD_DATA="$ADD_DATA --add-data data:data"
           for f in vaydns-client*linux*arm64*; do
             [ -f "$f" ] && ADD_DATA="$ADD_DATA --add-data $f:." && echo "Bundling: $f"
           done
@@ -379,6 +413,29 @@ jobs:
           path: release_files/
       - name: List files
         run: find release_files/ -type f | sort
+      - name: Generate SHA-256 manifest
+        # Publishes a SHA256SUMS.txt alongside the binaries so users (and
+        # automated mirror sites) can detect supply-chain tampering of
+        # release artifacts. Bundle ships only Anthropic's build output —
+        # if upstream MasterDNS/VayDNS binaries are compromised, the
+        # downstream hash here changes and end-users can compare against
+        # a known-good record.
+        run: |
+          cd release_files
+          {
+            echo "# KevinNet DNS ${{ github.ref_name }} — SHA-256 manifest"
+            echo "# Generated by GitHub Actions on $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+            echo "# Verify on Linux/macOS:   shasum -a 256 -c SHA256SUMS.txt"
+            echo "# Verify on Windows (PS):  Get-FileHash -Algorithm SHA256 <file>"
+            echo ""
+            find . -type f -not -name "SHA256SUMS.txt" | sort | while read f; do
+              sha=$(sha256sum "$f" | awk '{print $1}')
+              # Strip the leading ./ and the per-artifact folder for readability
+              name=$(basename "$f")
+              echo "$sha  $name"
+            done
+          } > SHA256SUMS.txt
+          cat SHA256SUMS.txt
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -408,6 +465,17 @@ jobs:
             xattr -d com.apple.quarantine KevinNet_macOS_*
             ```
 
+            ### Verifying downloads (recommended)
+
+            Every release ships with `SHA256SUMS.txt`. To verify a download:
+
+            ```bash
+            shasum -a 256 -c SHA256SUMS.txt     # macOS / Linux
+            ```
+            ```powershell
+            Get-FileHash -Algorithm SHA256 KevinNet_Windows_x64.exe  # Windows
+            ```
+
             See [README.md](README.md) for full setup and usage instructions.
           files: |
             release_files/Windows-x64/KevinNet_Windows_x64.exe
@@ -417,4 +485,5 @@ jobs:
             release_files/macOS-Intel/KevinNet_macOS_Intel
             release_files/Linux-x64/KevinNet_Linux_x64
             release_files/Linux-ARM64/KevinNet_Linux_ARM64
+            release_files/SHA256SUMS.txt
           draft: false

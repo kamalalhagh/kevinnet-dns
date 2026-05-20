@@ -31,6 +31,13 @@ echo "  OK"
 ADD_DATA=""
 [ -f "MasterDnsVPN"     ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN:."     && echo "  Bundling: MasterDnsVPN"
 [ -f "MasterDnsVPN.exe" ] && ADD_DATA="$ADD_DATA --add-data MasterDnsVPN.exe:." && echo "  Bundling: MasterDnsVPN.exe"
+# v3.3.0+: the resolver/CIDR data files live in data/ and are loaded at
+# runtime. Bundling them under data/ inside _MEIPASS preserves the same
+# layout the source tree uses.
+if [ -d "data" ]; then
+    ADD_DATA="$ADD_DATA --add-data data:data"
+    echo "  Bundling: data/ ($(ls data | wc -l) files)"
+fi
 echo ""
 
 echo "[2/3] Building binary..."

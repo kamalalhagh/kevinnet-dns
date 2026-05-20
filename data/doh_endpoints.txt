@@ -1,0 +1,55 @@
+# DNS-over-HTTPS endpoints — full URL form.
+# Tested by sending a real DNS query and timing the round trip.
+# One URL per line. Lines starting with # are ignored.
+# These run on port 443 (HTTPS); Iran's DPI can't easily distinguish
+# DoH traffic from normal web traffic, so these tend to survive longer.
+# Last bundled snapshot: 2026-05.
+
+# Cloudflare
+https://1.1.1.1/dns-query
+https://1.0.0.1/dns-query
+https://cloudflare-dns.com/dns-query
+
+# Google
+https://8.8.8.8/dns-query
+https://8.8.4.4/dns-query
+https://dns.google/dns-query
+
+# Quad9
+https://9.9.9.9/dns-query
+https://149.112.112.112/dns-query
+https://dns.quad9.net/dns-query
+
+# AdGuard
+https://94.140.14.14/dns-query
+https://dns.adguard-dns.com/dns-query
+
+# NextDNS public
+https://dns.nextdns.io
+
+# Mullvad
+https://194.242.2.2/dns-query
+https://dns.mullvad.net/dns-query
+
+# CleanBrowsing
+https://185.228.168.9/dns-query
+https://doh.cleanbrowsing.org/doh/family-filter/
+
+# CIRA Canadian Shield
+https://149.112.121.10/dns-query
+
+# OpenDNS
+https://208.67.222.222/dns-query
+https://doh.opendns.com/dns-query
+
+# LibreDNS (no-filter)
+https://88.198.92.222/dns-query
+https://doh.libredns.gr/dns-query
+
+# DNS.SB
+https://185.222.222.222/dns-query
+https://doh.dns.sb/dns-query
+
+# ControlD anonymous
+https://76.76.2.0/dns-query
+https://freedns.controld.com/p0

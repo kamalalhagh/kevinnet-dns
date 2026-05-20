@@ -72,6 +72,17 @@ encrypt_key.txt
 *.env
 .env.*
 
+# ── App runtime state ─────────────────────────────────────────
+# Created next to the binary on first run; per-user, not for source control
+kevinnet_settings.json
+masterdns_profiles/
+vaydns_profiles/
+
+# ── Tests ─────────────────────────────────────────────────────
+.pytest_cache/
+.coverage
+htmlcov/
+
 # ── Temp build files ──────────────────────────────────────────
 *.tmp
 *.bak

@@ -14,7 +14,7 @@
 
 ---
 
-## 💡 What is KevinNet?
+## What is KevinNet?
 
 A DNS tunnel disguises your internet traffic as ordinary DNS queries. Iran's DPI filtering cannot easily identify or block it. KevinNet handles all the technical parts  scanning for working resolvers, writing config files, copying binaries, launching the VPN  so you only need to fill in a few fields and click buttons.
 
@@ -25,14 +25,14 @@ Two VPN engines are supported:
 
 ---
 
-## ✨ What's New in 3.3.0
+## What's New in 3.3.0
 
-- 🔒  **DoH / DoT scanning** — new button scans a curated list of well-known DNS-over-HTTPS (port 443) and DNS-over-TLS (port 853) endpoints. Because the traffic is TLS, it's much harder for Iranian DPI to fingerprint as tunnel traffic than plain UDP/53.
-- 🖱  **Right-click context menu** on the resolver list — Copy IP, Copy all IPs, Open output folder.
+- 🔒  **DoH / DoT scanning** - new button scans a curated list of well-known DNS-over-HTTPS (port 443) and DNS-over-TLS (port 853) endpoints. Because the traffic is TLS, it's much harder for Iranian DPI to fingerprint as tunnel traffic than plain UDP/53.
+- 🖱  **Right-click context menu** on the resolver list - Copy IP, Copy all IPs, Open output folder.
 - ⏱  **Last-launched indicator** on each profile (`launched 5m ago`, `launched 3h ago`). Easy to spot which profile is currently active.
-- 💾  **Remembers your last inputs** — domain, country folder, and VPN mode are restored on next launch.
-- ✅  **Input validation** with clear error messages — no more confusing "parse TOML failed" errors when a paste contained a stray character.
-- 🔐  **Security hardening** — profile files are created with restrictive permissions on Linux/macOS so other users can't read your encryption keys.
+- 💾  **Remembers your last inputs** - domain, country folder, and VPN mode are restored on next launch.
+- ✅  **Input validation** with clear error messages - no more confusing "parse TOML failed" errors when a paste contained a stray character.
+- 🔐  **Security hardening** - profile files are created with restrictive permissions on Linux/macOS so other users can't read your encryption keys.
 - 🧪  **Test suite** with 87 tests runs in CI before every release build.
 - 📜  **SHA-256 checksums** published alongside every release so you can verify downloads.
 
@@ -70,7 +70,7 @@ shasum -a 256 -c SHA256SUMS.txt     # macOS / Linux
 Get-FileHash -Algorithm SHA256 KevinNet_Windows_x64.exe  # Windows
 ```
 
-Compare the output against the line for your platform in `SHA256SUMS.txt`. If they don't match, do not run the file — re-download from the official Releases page.
+Compare the output against the line for your platform in `SHA256SUMS.txt`. If they don't match, do not run the file - re-download from the official Releases page.
 
 ---
 
@@ -202,7 +202,7 @@ Click **▶ Start Scan**. Three automatic phases:
 - **Phase 2**  Full 6-check scoring: NS→A, TXT, RND, DPI, EDNS, NXD
 - **Phase 3**  Real E2E tunnel test through the VPN binary
 
-🟢 ★6/6 excellent · 🟡 ◆4–5 good · 🟠 ▸2–3 weak · ⚫ ·0–1 very weak
+🟢 6/6 excellent · 🟡 4–5 good · 🟠 2–3 weak · ⚫ ·0–1 very weak
 
 ### Step 5  Save to Profiles
 
@@ -213,15 +213,15 @@ A profile is saved with sensible defaults. The VPN binary is copied into the out
 
 ### (Optional) Export DNS List
 
-After any scan, the **📤 Export DNS List** button becomes active regardless of which VPN mode you used. Click it to save the found resolver IPs as a plain `.txt` file — one IP per line. Useful if you want to use the resolver list in another application or script.
+After any scan, the **📤 Export DNS List** button becomes active regardless of which VPN mode you used. Click it to save the found resolver IPs as a plain `.txt` file - one IP per line. Useful if you want to use the resolver list in another application or script.
 
-### (Optional) DoH / DoT Scan — encrypted transports
+### (Optional) DoH / DoT Scan - encrypted transports
 
-The **🔒 Scan DoH/DoT** button (new in 3.3.0) probes a curated list of well-known DNS-over-HTTPS (port 443) and DNS-over-TLS (port 853) endpoints. The traffic looks like normal HTTPS, so it's much harder for Iranian DPI to fingerprint as tunnel traffic than plain UDP/53. Working endpoints stream into the results list with a 🔒 icon — paste any of them into a VayDNS profile as a custom resolver when UDP isn't surviving DPI.
+The **🔒 Scan DoH/DoT** button (new in 3.3.0) probes a curated list of well-known DNS-over-HTTPS (port 443) and DNS-over-TLS (port 853) endpoints. The traffic looks like normal HTTPS, so it's much harder for Iranian DPI to fingerprint as tunnel traffic than plain UDP/53. Working endpoints stream into the results list with a 🔒 icon - paste any of them into a VayDNS profile as a custom resolver when UDP isn't surviving DPI.
 
 The lists live in `data/doh_endpoints.txt` and `data/dot_endpoints.txt` next to the app. You can edit them to add private endpoints or remove dead ones without rebuilding.
 
-### Tip — right-click any resolver
+### Tip - right-click any resolver
 
 In the results list, right-click (or two-finger click / Ctrl-click on Mac) to **Copy IP**, **Copy all IPs**, or **Open output folder** in your file manager.
 
@@ -293,7 +293,7 @@ Every save creates a profile in `masterdns_profiles/` or `vaydns_profiles/` next
 
 ### MasterDnsVPN binary missing
 
-> **KevinNet v3.0.9+ bundles the correct binary automatically for every platform — upgrade first before trying manual steps below.**
+> **KevinNet v3.0.9+ bundles the correct binary automatically for every platform - upgrade first before trying manual steps below.**
 
 Download the client binary from the [MasterDnsVPN releases](https://github.com/masterking32/MasterDnsVPN/releases/latest):
 
@@ -309,7 +309,7 @@ Download the client binary from the [MasterDnsVPN releases](https://github.com/m
 1. Extract the ZIP
 2. Rename the binary to `MasterDnsVPN` (macOS/Linux) or `MasterDnsVPN.exe` (Windows)
 3. Place it **next to the KevinNet app**
-4. Click **Save to MasterDNS Profiles** again — it copies automatically
+4. Click **Save to MasterDNS Profiles** again - it copies automatically
 
 ### vaydns-client binary missing
 
@@ -432,7 +432,7 @@ The config file has an unfilled placeholder. This happens if you launch from the
 - Change **Balancing Strategy** to `3  Least Loss`
 - Re-scan to get a fresh set of resolvers  old ones may have been blocked
 
-**Only a handful of resolvers work (most are ★1–2)**
+**Only a handful of resolvers work (most are 1–2)**
 
 This is normal  most public DNS servers don't forward DNS queries for custom NS delegations. A score of 10–30 good resolvers from a scan of 200k IPs is a good result.
 
@@ -503,7 +503,7 @@ pip install pytest dnspython pillow
 python -m pytest tests/ -v
 ```
 
-All tests must pass before a release is built — the CI workflow gates the platform-specific builds behind a successful `pytest` run.
+All tests must pass before a release is built - the CI workflow gates the platform-specific builds behind a successful `pytest` run.
 
 ### Editing bundled data lists
 
@@ -517,7 +517,7 @@ The Iranian CIDR ranges, public DNS resolvers, WhiteDNS Iran list, and DoH/DoT e
 | `data/doh_endpoints.txt` | DNS-over-HTTPS endpoints scanned by the 🔒 button |
 | `data/dot_endpoints.txt` | DNS-over-TLS endpoints scanned by the 🔒 button |
 
-You can edit these files to add private endpoints or remove dead entries — no rebuild needed. When PyInstaller bundles the binary it copies them inside, and the app also looks for a `data/` folder next to the executable so user edits take priority over the bundled copy.
+You can edit these files to add private endpoints or remove dead entries - no rebuild needed. When PyInstaller bundles the binary it copies them inside, and the app also looks for a `data/` folder next to the executable so user edits take priority over the bundled copy.
 
 ---
 

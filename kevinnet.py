@@ -8,14 +8,14 @@ import asyncio, os, queue, random, sys, threading, time
 from datetime import datetime
 from pathlib import Path
 
-__version__ = "3.3.2"
+__version__ = "4.0.0"
 
 # ── Embedded app icon (base64 PNG, 256x256) ────────────────────
 ICON_B64 = (
     "iVBORw0KGgoAAAANSUhEUgAAAQAAAAEACAYAAABccqhmAAAJ7UlEQVR4nO3dPW4byRYG0PLDAAYmUWJoDY68EL3lMPIKHGk5w4U48hoIJ0oMOPJLHjUU1WT/VXfdqjonGUi2yAanv4+3qptWSgAAAEAPPpQ+gEsPnz7/KX0MsIeXnz9CZK/YQQg7vFWiFHZ9QqGHafYqg12eRPBhma2LYNMHXxL8j38/bHEoEMbvXy+zf2arItjkQecEX+Dp3ZxCyF0E2QtgSviFHoZNKYOcJZC1AMbCL/gwzVgR5CqBLA8i+LCNrYtgdQHcC7/gQx73imBNCfxn6Q+mJPywl3t5WnOZfXEBCD/sa4sSWDQ63HoywYd93FoSzF0OzJ4AhB/Ku5W3uZPAqj2AsYMBtpMjd7MKYKhdhB/KGcrfnClgcgH4QA/UY2peJxWAdT/EtWY/YPEegPBDHEvzOFoA1v1QhyX7AVmuAgB1ulsA3v2hLnOnABMAdOxmAXj3hzrNmQJMANCxyQXg3R/qMTWvgwXgrj9oz1CuLQGgY5MKwPgP9ZmSWxMAdEwBQMfeFYANQGjXdb5HJwDrf6jXWH4tAaBjCgA6pgCgY3+VPgBozel4+Hr9vcen528ljmXMu18icL1LaBOQ6E7HQ3p8ei59GIPBv1aiCK5/icjlLw+xBKBqp+PhzX8LHsdo+Of8vb1UOwHUNGaxjaHQl5gEloR6z3O1uQng1gserV3Zzq13/L0ngaXnXJRztboCGHvhorywbON0PIyGvPRyoCZVFUCt6yzyiBbstedZhPO0qgKgX3PDH60solIAhLc0zAFK4J/SBzDGjUCEtjbEa+8ROB0PX1YdQHAKgLByvYOvDfHj0/P3G49bfA2/VnX3AUS924q8Mo/vX1JK37e4R2BNCex1nt67D6C6CeDx6fnbvRd9rxd1y/VlhNtaS9nodf1+fuyeX9shVW4C3gq5d/667bFpl/s5lp5zUc7V6iaAsygvIHkE2LFfbGwqHfr7Wx7PHFVOALSlwO272R9zaqgjhT+liicA2lDqnX+L/YBzuGv6oJoCoJjSY/9Wm4JRwz7EEoDdTflAz16iHEcpCoBdRQtc75cFFQC7Ef54FAC7EP6YbAKyuUjhF/y3TABsSvhjUwBsRvjjswQgu0jBT0n47zEBkJXw10UBkI3w10cBkIXw18keAKtFCr/gz2MCYBXhr5sCYDHhr58lALNFCn5Kwr+GCYBZhL8tCoDJhL89lgBMEin8gp+PCYBRwt8uBcBdwt82BcBNwt8+ewC8Eyn4KQn/lkwAvCH8fVEAvBL+/lgCkFKKFX7B348JAOHvmALonPD3zRKgU5GCn5Lwl2IC6JDwc6YAOiP8XFIAHRF+rtkD6ESk8At+HCaADgg/tyiAxgk/91gCNCpS8FMS/qhMAA0SfqZSAI0RfuawBGhIpPALfh1MAI0QfpZQAA0QfpZSAJUTftawB1CpSMFPSfhrZQKokPCTiwKojPCTkyVARSKFX/DbYAKohPCzBQVQAeFnK5YAgUUKfkrC3yITQFDCzx4UQEDCz14UAHcJf9vsATBI8PtgAuAd4e+HAuAN4e+LAuCV8PdHAZBSEv5eKQCEv2MKoHPC3zeXATsl+KRkAuiS8HOmADoj/FxSAB0Rfq4pgE4IP0MUQAeEn1tcBWiY4DNGATRK+Ms5HQ9fr7/3+PT8rcSxjLEEaJDwlzMU/nvfL00BNEb4yxkLecQSUAABLQ2x8JczNdzRSkABBDU3zMLPEgoAOqYAgpr7LwNH+5eEqYMCCGhpmJUAcymAxiiBMqZe5492P4ACaJASKGMs3NHCn5ICaJYSKONWyCOGP6WUPlx/4+HT5z+XX3/8+2G/o6lITQFzibBvv3+9vPn65eeP19ybADpQU1mxLwXQCSXAEAXQESXANQXQGSXAJQXQISXAmQLo1Ol4UAQogN4pgb4pAJRAxxQAKSUl0CsFwCsl0B8FwBtKoC8KgHeUQD8UAINcJuyDAuAuJdA2BRBQtI/vKoF2KYCglAB7UACBPT49hyoCJdAeBVABJcBWFEAllABbUAAViVYCiqB+CqAykUogJdNA7RRAhZQAuSiASrlCQA4KoHJKgDUUQAOUAEspgEYoAZZQAA2JVgKKID4F0JhIJZCSaSA6BdAgJcBUCqBRLhMyhQJonBLgHgXQASXALQqgE9FKQBHEoAA6EqkEUjINRKAAOqMEuKQAOqQEOFMAnXKZkJQUQPeUQN8UAEqgYwqAlFK8ElAE+1AAvIpUAimZBvagAHhDCfRFAfCOKwT9UADcpATapwC4Swm0TQEwSgm0SwEwSbQSUAR5KAAmi1QCKZkGclAAzKIE2qIAmM1lwnYoABZTAvVTAKyiBOqmAFgtWgkogukUAFlEKoGUTANTKQCyUQL1UQBkpQTqogDIzmXCeigANqME4lMAbEoJxKYA2Fy0ElAE/1IA7CJSCaRkGjhTAOxGCcSjANiVEohFAbC7SJcJoxxHKQqAYkqHr/TzR/BX6QOgb49Pz0XG8C3Dfzoevg4837fNnnAFBUBxe5fAVuEfCv71n0UrAksAQqh9HL8X/iV/by/VTgA1jVlMs8cksEXRzA316Xj4GuVcrXICuPWCR2tX5tvyCkGE8K/9udyqmwDGXri92rX2kTW63NOA/1/DqpoAal1nsUzG0H7J9UCX1p5nEc7T6iYA+rJ2Ejj//Ol4WFwCj0/P3xcfQHAKgPCWlsB5glgT4NPx8GVNeaSU/rviZzenAKjC3BLItXy4Vx4TRvh/shzEhqraA6BvFW7khX73T6myApi6ux/lGiv5TblMuFdRrD3PIpynVRVASuMvWoQXle3dCnmFU0JR1RVASrdDLvx9uQ57ifAvPeeinKsfrr/x8Onzn8uvP/79sN/RwAKn46H4O/+ca/p7h//3r5c3X7/8/PGa+yonALhUOvz/P4Yq96dMAJBZtA+q3ZsAFAA0zhIAGKQAoGMKADo2WgDX6wegHmP5fVcAlxsEQFuu820JAB1TANCxSQVgHwDqMyW3JgDo2GAB2AiE9gzlevIEYBkA9ZiaV0sA6NjNAhgaF0wBEN9QTm8t600A0LG7BWAKgLrMefdPyQQAXRstAFMA1GHuu39KKyYAJQBxLM3jpAK41SJKAMq7lcMpN/RNngDcHQj1mJrXWUsA+wEQy5J1/6UsVwGUAOwvR+5mF4D9AChvzbr/0uJ1/fXvD7jkdwnANu690S7Zp1u8BLj3ZKYByC93+FNauQegBGAfW4Q/pRVLgEv3lgMpWRLAUmNvpGsvz2e9tq8III+tg3+W/eaesRJISRHALVOWzjlvytvk7r4pJXCmDOjdnP2y3Hfkbnp775wiOFMItG7JBvlWt+Lvcn//kiIAtv8Mzq4f8FEEMM1eH74r9gk/ZQBvlfjEbaiP+CoFeuHj9QAAQAH/AzFTLcS0T04yAAAAAElFTkSuQmCC"
 )
 
-# Windows asyncio fix — MUST be before any asyncio usage
+# Windows asyncio fix - MUST be before any asyncio usage
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
@@ -60,7 +60,7 @@ def app_dir() -> Path:
 
 
 # ── Input validators ─────────────────────────────────────────────
-# Used both at scan-start (UI-driven) and by tests. Pure functions —
+# Used both at scan-start (UI-driven) and by tests. Pure functions -
 # all return (ok: bool, error_message_en: str).
 
 import re as _re_mod
@@ -99,7 +99,7 @@ def validate_masterdns_key(key: str) -> tuple[bool, str]:
         return False, "Encryption key is empty"
     if len(k) != 32:
         return False, f"Encryption key must be 32 characters (got {len(k)})"
-    # Reject control characters and shell metas — defence in depth
+    # Reject control characters and shell metas - defence in depth
     if any(c < " " or c == '"' or c == "\\" for c in k):
         return False, "Encryption key contains invalid characters"
     return True, ""
@@ -108,7 +108,7 @@ def validate_masterdns_key(key: str) -> tuple[bool, str]:
 def validate_vaydns_pubkey(pubkey: str) -> tuple[bool, str]:
     """Validate the VayDNS public key. Must be 64 lowercase hex chars.
 
-    Mixed case is accepted (we normalise on save) — but only hex chars."""
+    Mixed case is accepted (we normalise on save) - but only hex chars."""
     k = (pubkey or "").strip()
     if not k:
         return False, "Public key is empty"
@@ -181,7 +181,7 @@ def _format_last_launched(ts_str: str, fa: bool = False) -> str:
     delta = datetime.now() - then
     secs  = int(delta.total_seconds())
     if secs < 0:
-        # Clock skew or future timestamp — treat as just-now
+        # Clock skew or future timestamp - treat as just-now
         return "launched just now" if not fa else "همین الان اجرا شد"
     if secs < 60:
         return ("launched just now" if not fa else "همین الان اجرا شد")
@@ -194,7 +194,7 @@ def _format_last_launched(ts_str: str, fa: bool = False) -> str:
     d = secs // 86400
     if d < 30:
         return (f"launched {d}d ago" if not fa else f"{d} روز پیش اجرا شد")
-    # Older than 30 days — show the absolute date, more informative
+    # Older than 30 days - show the absolute date, more informative
     return (f"launched {ts_str[:10]}" if not fa else f"اجرا شد {ts_str[:10]}")
 
 
@@ -214,7 +214,7 @@ def get_masterdns_exe() -> Path | None:
         return local
 
     # 2. Bundled inside PyInstaller temp dir (_MEIPASS)
-    # Return the _MEIPASS path directly — write_profile_files copies it to the
+    # Return the _MEIPASS path directly - write_profile_files copies it to the
     # country folder. We never copy to app_dir() to avoid leaving the binary
     # sitting next to the app after every save.
     if getattr(sys, "frozen", False):
@@ -235,7 +235,7 @@ def bind_mousewheel(widget, canvas):
     """Bind touchpad/mousewheel scroll on widget to scroll canvas.
     Works on macOS (delta), Windows (delta/120), Linux (Button-4/5).
     Call this on every widget inside a scrollable canvas so the
-    entire area responds to the touchpad — not just the scrollbar."""
+    entire area responds to the touchpad - not just the scrollbar."""
     def _scroll(e):
         if sys.platform == "darwin":
             canvas.yview_scroll(-1 * int(e.delta), "units")
@@ -256,7 +256,7 @@ def bind_mousewheel_recursive(widget, canvas):
 
 # ═══════════════════════════════════════════════════════════════
 # Data files (CIDR ranges, public resolvers, WhiteDNS Iran list) live in
-# the `data/` folder next to the app — bundled into PyInstaller `_MEIPASS`
+# the `data/` folder next to the app - bundled into PyInstaller `_MEIPASS`
 # at build time, but can be replaced/extended by dropping a newer file
 # alongside the executable without rebuilding.
 def _data_file(name: str) -> Path | None:
@@ -282,7 +282,7 @@ def _data_file(name: str) -> Path | None:
 
 def _read_data_lines(name: str, fallback: str = "") -> str:
     """Read a bundled data file and return its raw contents.
-    Falls back to the provided string literal if no copy is found —
+    Falls back to the provided string literal if no copy is found -
     keeps the app functional even if data files are missing."""
     p = _data_file(name)
     if p is None:
@@ -293,7 +293,7 @@ def _read_data_lines(name: str, fallback: str = "") -> str:
         return fallback
 
 
-# Embedded data lists — the full lists are baked into the binary so the
+# Embedded data lists - the full lists are baked into the binary so the
 # app works out of the box with no data/ folder needed. Users who want
 # to customise the lists (add private endpoints, refresh stale CIDRs)
 # can drop an edited copy at data/<name>.txt next to the executable,
@@ -3176,7 +3176,7 @@ def get_builtin_resolvers() -> list[str]:
     """
     Returns shuffled list of resolvers to test.
     Priority order:
-      1. WhiteDNS Iran list (pre-verified from range-scout — best quality)
+      1. WhiteDNS Iran list (pre-verified from range-scout - best quality)
       2. Well-known public resolvers (Google, Cloudflare, etc.)
     """
     # WhiteDNS Iran pre-verified resolvers (from range-scout android app)
@@ -3201,7 +3201,7 @@ def get_iran_sample(max_ips: int = 200_000) -> list[str]:
     """Sample IPs evenly from Iran CIDR ranges.
 
     Returns an empty list if no valid CIDR ranges are loaded (e.g. data file
-    missing and fallback is empty) — protects callers from div/0 and surprises.
+    missing and fallback is empty) - protects callers from div/0 and surprises.
     """
     import ipaddress as _ip
     nets = []
@@ -3225,7 +3225,7 @@ def get_iran_sample(max_ips: int = 200_000) -> list[str]:
         if count <= 0:
             continue
         take = min(per_net, count)
-        # randint inclusive on both ends — offset 0..count-take so the window
+        # randint inclusive on both ends - offset 0..count-take so the window
         # [start+1 .. start+take] always stays inside the usable host range.
         offset = random.randint(0, count - take)
         hosts = [str(net.network_address + 1 + offset + i) for i in range(take)]
@@ -3250,7 +3250,7 @@ def get_parent_domain(domain: str) -> str:
 
 
 def base32_encode(data: bytes) -> str:
-    """Base32 without padding — matches DNSTT tunnel format."""
+    """Base32 without padding - matches DNSTT tunnel format."""
     alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
     output   = []
     buf, bits = 0, 0
@@ -3304,7 +3304,7 @@ async def _resolve(ip, qname, qtype, timeout, use_edns=False, edns_size=1232):
 
 
 # ── Transparent proxy detector ────────────────────────────────────
-# RFC 3330 documentation IPs — should NEVER have open DNS resolvers.
+# RFC 3330 documentation IPs - should NEVER have open DNS resolvers.
 # If any respond, there is a transparent proxy between client and internet.
 _TRANSPARENT_PROXY_IPS = ["192.0.2.1", "198.51.100.1", "203.0.113.1"]
 
@@ -3326,7 +3326,7 @@ async def detect_transparent_proxy(domain: str, timeout: float) -> bool:
 
 # ── Phase 1: quick alive check ────────────────────────────────────
 async def _quick_alive(ip, domain, timeout, sem):
-    """Fast warmup query — only accept response (any rcode)."""
+    """Fast warmup query - only accept response (any rcode)."""
     async with sem:
         # Warmup: direct query to the tunnel domain (as range-scout does)
         responded, _, _, ms = await _resolve(ip, domain, "A", timeout)
@@ -3336,7 +3336,7 @@ async def _quick_alive(ip, domain, timeout, sem):
 # ── Phase 2: full 6-check (range-scout algorithm) ────────────────
 async def _full_check(ip, domain, timeout, sem):
     """
-    6/6 checks — ported from range-scout DnsScanEngine:
+    6/6 checks - ported from range-scout DnsScanEngine:
       1 NS→A        : resolver forwards to real authoritative NS
       2 TXT         : handles TXT queries (tunnel carries data in TXT)
       3 RND         : forwards random double-subdomain (tested twice)
@@ -3403,7 +3403,7 @@ async def _full_check(ip, domain, timeout, sem):
 
         # 4 · TUNNEL-REAL (DPI check) ──────────────────────────
         # Build a real DNSTT-format query: Base32-encoded random bytes
-        # split into 57-char labels — this is the actual tunnel payload format.
+        # split into 57-char labels - this is the actual tunnel payload format.
         # Iran's DPI drops these. If we get ANY response, DPI is not blocking.
         try:
             # Calculate payload size (from range-scout tunnelRealismPayload)
@@ -3435,7 +3435,7 @@ async def _full_check(ip, domain, timeout, sem):
                     ip, rnd_sub, "A", timeout, use_edns=True, edns_size=buf)
                 if not responded:
                     break
-                # Check for FORMERR via NoNameservers errors — means EDNS rejected
+                # Check for FORMERR via NoNameservers errors - means EDNS rejected
                 # If responded = True and we got here, EDNS was accepted
                 edns_ok = True
                 edns_sz = buf
@@ -3461,10 +3461,10 @@ async def _full_check(ip, domain, timeout, sem):
         except Exception:
             parts.append("NXD✗")
 
-        # Score threshold: 4/6 minimum (balanced — range-scout default is 2,
+        # Score threshold: 4/6 minimum (balanced - range-scout default is 2,
         # but for Iran tunnel we need at minimum RND+DPI+EDNS working)
         # Show ALL resolvers that survived Phase 1 (responded to warmup).
-        # We score them but don't filter here — E2E is the real gate.
+        # We score them but don't filter here - E2E is the real gate.
         # A resolver scoring 2/6 might still work perfectly in MasterDNS.
         passes = True   # always show; E2E phase is the actual filter
         return ip, score, 6, ms_out, "  ".join(parts), passes
@@ -3482,9 +3482,9 @@ async def run_scan(ips, domain, concurrency, timeout_s, target,
     Running concurrency * 6 sockets at once causes kernel panics on macOS
     Intel when scanning large pools (200k+).
     """
-    # Phase 1: 1 socket per task — use full concurrency
+    # Phase 1: 1 socket per task - use full concurrency
     sem_p1    = asyncio.Semaphore(concurrency)
-    # Phase 2: up to 6 sockets per task — cap at concurrency // 4
+    # Phase 2: up to 6 sockets per task - cap at concurrency // 4
     p2_conc   = max(20, concurrency // 4)
     sem_p2    = asyncio.Semaphore(p2_conc)
 
@@ -3516,7 +3516,7 @@ async def run_scan(ips, domain, concurrency, timeout_s, target,
                 survivors.append(ip)
             pct = tested_p1 / total_p1 * 50 if total_p1 else 0
             on_progress(tested_p1, total_p1, found, pct,
-                f"Phase 1/2 — alive scan  {tested_p1:,}/{total_p1:,}"
+                f"Phase 1/2 - alive scan  {tested_p1:,}/{total_p1:,}"
                 f"  alive: {len(survivors)}")
     for t in tasks:
         t.cancel()
@@ -3550,7 +3550,7 @@ async def run_scan(ips, domain, concurrency, timeout_s, target,
                 on_result(ip, score, max_s, ms, detail)
             pct = 50 + (tested_p2 / total_p2 * 50 if total_p2 else 0)
             on_progress(tested_p2, total_p2, found, pct,
-                f"Phase 2/2 — deep check  {tested_p2:,}/{total_p2:,}"
+                f"Phase 2/2 - deep check  {tested_p2:,}/{total_p2:,}"
                 f"  verified: {found}")
             if found >= target:
                 stop_ev.set(); break
@@ -3563,7 +3563,7 @@ async def run_scan(ips, domain, concurrency, timeout_s, target,
 #  PHASE 3: E2E VERIFICATION via bundled SlipNet binary
 #  Runs the actual MasterDNS tunnel test on DNS-verified resolvers.
 #  This is the ONLY way to confirm a resolver actually works for
-#  MasterDNS — DNS checks alone are not enough.
+#  MasterDNS - DNS checks alone are not enough.
 # ═══════════════════════════════════════════════════════════════
 
 def run_e2e_verify(found_ips: list, domain: str, timeout_s: float,
@@ -3571,7 +3571,7 @@ def run_e2e_verify(found_ips: list, domain: str, timeout_s: float,
     """
     Pipe found_ips through the bundled SlipNet binary's DNS scanner.
     SlipNet option 2 (DNS Scanner) will test each IP against the real
-    MasterDNS protocol including MTU negotiation — the actual tunnel test.
+    MasterDNS protocol including MTU negotiation - the actual tunnel test.
 
     Writes a temp resolvers file → launches slipnet binary → parses output.
     """
@@ -3579,7 +3579,7 @@ def run_e2e_verify(found_ips: list, domain: str, timeout_s: float,
 
     bin_path = get_masterdns_exe()
     if not bin_path:
-        on_log("⚠  SlipNet binary not found — skipping E2E verification")
+        on_log("⚠  SlipNet binary not found - skipping E2E verification")
         on_e2e_done(found_ips)   # return all found IPs unfiltered
         return
 
@@ -3589,7 +3589,7 @@ def run_e2e_verify(found_ips: list, domain: str, timeout_s: float,
         f.write("\n".join(found_ips) + "\n")
         tmp_path = f.name
 
-    on_log(f"Phase 3 — E2E verify via SlipNet: {len(found_ips)} resolvers → {bin_path.name}")
+    on_log(f"Phase 3 - E2E verify via SlipNet: {len(found_ips)} resolvers → {bin_path.name}")
 
     try:
         # Build the interactive input sequence:
@@ -3633,7 +3633,7 @@ def run_e2e_verify(found_ips: list, domain: str, timeout_s: float,
             m = _ip_re.search(line)
             if m:
                 ip    = m.group(1)
-                # Final sanity check — the regex is strict but never trust input
+                # Final sanity check - the regex is strict but never trust input
                 try:
                     _ipa.IPv4Address(ip)
                 except ValueError:
@@ -3642,22 +3642,22 @@ def run_e2e_verify(found_ips: list, domain: str, timeout_s: float,
                 ms    = int(m.group(3))
                 if ip in found_ips:   # include any ip slipnet accepts
                     verified.append(ip)
-                    icon = "★" if score == 6 else "◆" if score >= 4 else "▸"
+                    icon = "" if score == 6 else "" if score >= 4 else ""
                     on_verified(ip, score, ms, f"{icon} E2E {score}/6")
 
         if verified:
             on_log(f"E2E verified: {len(verified)}/{len(found_ips)} resolvers pass real tunnel test")
         else:
-            on_log(f"⚠  E2E: no resolvers passed real tunnel test — returning DNS-verified list")
+            on_log(f"⚠  E2E: no resolvers passed real tunnel test - returning DNS-verified list")
             verified = found_ips   # fallback: use DNS-verified list
 
         on_e2e_done(verified)
 
     except subprocess.TimeoutExpired:
-        on_log("⚠  E2E verification timed out — using DNS-verified resolvers")
+        on_log("⚠  E2E verification timed out - using DNS-verified resolvers")
         on_e2e_done(found_ips)
     except Exception as e:
-        on_log(f"⚠  E2E error: {e} — using DNS-verified resolvers")
+        on_log(f"⚠  E2E error: {e} - using DNS-verified resolvers")
         on_e2e_done(found_ips)
     finally:
         try:
@@ -3675,7 +3675,7 @@ def run_e2e_verify(found_ips: list, domain: str, timeout_s: float,
 # Iran's DPI has been getting steadily better at flagging plain UDP/53
 # traffic, including the kind generated by DNS tunnels. DoH (port 443)
 # and DoT (port 853) ride on top of TLS, so the DPI sees an opaque
-# TLS handshake to a foreign IP — much harder to fingerprint as
+# TLS handshake to a foreign IP - much harder to fingerprint as
 # tunnel traffic specifically. The tradeoff:
 #
 #   DoH (port 443):  hardest to block (looks like HTTPS), slowest per query
@@ -3705,7 +3705,7 @@ async def _probe_doh(endpoint: str, timeout: float) -> tuple[bool, float]:
     """Send a real DNS query over DoH; return (ok, elapsed_ms).
 
     Uses a benign query (cloudflare.com A) so the resolver actually has
-    to do work — a more honest reachability + latency test than just a
+    to do work - a more honest reachability + latency test than just a
     TCP connect. Runs the sync dns.query.https call in a thread executor
     because dnspython's async DoH support is uneven across versions and
     a thread offload is portable.
@@ -3731,7 +3731,7 @@ async def _probe_doh(endpoint: str, timeout: float) -> tuple[bool, float]:
 async def _probe_dot(endpoint: str, timeout: float) -> tuple[bool, float]:
     """Send a real DNS query over DoT; return (ok, elapsed_ms).
 
-    Endpoint is host[:port] — default port 853 when omitted."""
+    Endpoint is host[:port] - default port 853 when omitted."""
     import dns.message, dns.query
     host, _, port_s = endpoint.partition(":")
     try:
@@ -3760,7 +3760,7 @@ async def run_doh_dot_scan(transport: str, endpoints: list[str],
     """Probe each endpoint once and stream results back via callbacks.
 
     transport: "doh" or "dot". concurrency is capped low (max 10) because
-    each probe holds a TLS connection open — too many parallel TLS handshakes
+    each probe holds a TLS connection open - too many parallel TLS handshakes
     against the same provider can trigger rate limits."""
     sem = asyncio.Semaphore(min(max(2, concurrency), 10))
     total = len(endpoints)
@@ -3798,7 +3798,7 @@ async def run_doh_dot_scan(transport: str, endpoints: list[str],
 # ═══════════════════════════════════════════════════════════════
 
 # ═══════════════════════════════════════════════════════════════
-#  BIDI FIX — Persian/Arabic text rendering
+#  BIDI FIX - Persian/Arabic text rendering
 # ═══════════════════════════════════════════════════════════════
 # ── Linux: install bundled Vazirmatn font so tkinter/fontconfig can use it ───
 if sys.platform == "linux":
@@ -3843,24 +3843,24 @@ if sys.platform == "win32":
 
 # Tkinter on Windows AND Linux does not auto-join Arabic/Persian characters
 # or reorder RTL text. Fix: use arabic_reshaper + python-bidi.
-# macOS has native CoreText BiDi — excluded.
+# macOS has native CoreText BiDi - excluded.
 #
 # Two bidi helpers are defined:
 #
-#  _bidi(s)        — for Tk widgets (Label, Button, Text, Treeview…).
+#  _bidi(s)        - for Tk widgets (Label, Button, Text, Treeview…).
 #                    On Windows: reshape + get_display + LRO…PDF wrapper so
 #                    GDI renders the already-visual-ordered string as-is.
 #                    On Linux: reshape + get_display (FreeType renders as-is).
 #                    Multi-line strings: each line processed independently.
 #
-#  _bidi_native(s) — for native Win32 dialogs (messagebox, window titles).
+#  _bidi_native(s) - for native Win32 dialogs (messagebox, window titles).
 #                    Win32's Uniscribe/DirectWrite already handles shaping
 #                    and BiDi from logical-order text.  Only a U+200F (RLM)
 #                    prefix is needed to signal RTL direction; applying our
 #                    own get_display would double-reverse the text.
 #                    On Linux (Tk dialogs, not native): same as _bidi.
 
-# Safe no-op fallback — overridden on Windows/Linux below.
+# Safe no-op fallback - overridden on Windows/Linux below.
 # Always defined so show_help and other module-level code can call _bidi()
 # on any platform without a NameError (macOS uses CoreText natively).
 def _bidi(s: str) -> str:          # type: ignore[misc]
@@ -3895,7 +3895,7 @@ if _needs_bidi_fix:
                     return "\u200f" + s
                 return s
 
-        else:  # linux — Tk uses FreeType which renders chars in string order
+        else:  # linux - Tk uses FreeType which renders chars in string order
             def _bidi_line(s: str) -> str:
                 if any("\u0600" <= c <= "\u06ff" for c in s):
                     return _bidi_display(_ar.reshape(s))
@@ -4010,34 +4010,230 @@ if _needs_bidi_fix:
 
 
 # ═══════════════════════════════════════════════════════════════
-#  DESIGN TOKENS — warm, modern, user-friendly palette
+#  DESIGN TOKENS - themed palette (Iranian Sky, dark + light)
 # ═══════════════════════════════════════════════════════════════
-BG     = "#1a1f2e"       # deep navy — easy on eyes
-PANEL  = "#141824"       # top bar / footer
-CARD   = "#212840"       # card surfaces
-BORDER = "#2e3a54"       # borders
-ACCENT = "#00c9a7"       # teal — scan button
-BLUE   = "#5b8ff9"       # periwinkle — save button
-GREEN  = "#2ecc71"       # vivid green — success
-WARN   = "#f5a623"       # amber — scanning
-DANGER = "#e74c3c"       # red — stop
-PURPLE = "#7c3aed"       # purple — connect / e2e verified
-TEXT   = "#eef2ff"       # near-white
-MUTED  = "#7b8db5"       # cool grey labels
-INPUT  = "#0f1320"       # input background
-HINT   = "#4e5f80"       # secondary hint text
+#
+# How the theme system works:
+#
+#   The app references colors via module-level globals (BG, CARD, ACCENT,
+#   etc.). Two palette dictionaries below define every color for dark and
+#   light modes. At import time the active palette is chosen by reading
+#   the saved preference (or detecting the OS appearance), and the global
+#   names are bound from that palette.
+#
+#   `apply_theme(name)` swaps the active palette and re-binds every
+#   global to the new values. The function also walks the live Tk widget
+#   tree and re-applies bg/fg on every Frame/Label/Button/Entry/Treeview,
+#   so the switch is live - no restart needed.
+#
+#   Existing call-sites referencing `BG`, `CARD`, etc. keep working
+#   unchanged because they import these names at function-call time, not
+#   at module-load time. Tkinter widgets store the color at .config()
+#   time though, which is why we have to walk the tree.
+#
+# Palette is "Iranian Sky" - subtle Persian-poetry warmth, accessible
+# WCAG AA contrast for body text in both modes.
 
-# All button text is always pure black — max readability on any bg
-BTN_TEXT = "#000000"
-SCAN_FG  = "#000000"
-STOP_FG  = "#000000"
-SAVE_FG  = "#000000"
-CLEAR_FG = "#000000"
-BTN_FG   = "#000000"
+_THEME_DARK = {
+    "BG":      "#14181F",   # window background
+    "PANEL":   "#0F131A",   # top bar / footer (slightly darker than BG)
+    "CARD":    "#1E2530",   # cards / panels (one step lighter than BG)
+    "BORDER":  "#303B4A",   # 1px hairlines
+    "ACCENT":  "#14B8A6",   # teal - primary action (Start Scan)
+    "BLUE":    "#3B82F6",   # blue - secondary action (Save MasterDNS)
+    "GREEN":   "#84CC16",   # lime - success
+    "WARN":    "#FB923C",   # orange - scanning / in-progress
+    "DANGER":  "#F43F5E",   # rose - stop / destructive
+    "PURPLE":  "#C084FC",   # lavender - VayDNS-specific actions
+    "TEXT":    "#ECECEC",   # primary text
+    "MUTED":   "#8E9DB0",   # secondary text (metadata, labels)
+    "INPUT":   "#0B0E14",   # input field background (darker than BG)
+    "HINT":    "#5C6675",   # placeholder text in inputs
+    "BTN_TEXT":"#0B0E14",   # text on colored buttons (dark on accent)
+    "DIS_BG":  "#252D3A",   # disabled button background
+    "DIS_FG":  "#4A5566",   # disabled button text
+}
 
-# Disabled state — clearly off but still readable
-DIS_BG   = "#252d42"
-DIS_FG   = "#4a5a7a"
+_THEME_LIGHT = {
+    "BG":      "#FAFAF7",   # warm off-white
+    "PANEL":   "#F2F2EE",   # top bar / footer (one step darker than BG)
+    "CARD":    "#FFFFFF",   # cards stand out as pure white
+    "BORDER":  "#E5E2DB",   # warm hairline
+    "ACCENT":  "#0D9488",   # darker teal for AA contrast on white
+    "BLUE":    "#2563EB",   # darker blue for AA contrast
+    "GREEN":   "#65A30D",   # darker lime
+    "WARN":    "#EA580C",   # darker orange
+    "DANGER":  "#E11D48",   # darker rose
+    "PURPLE":  "#9333EA",   # darker purple for AA contrast on white
+    "TEXT":    "#1F242E",   # near-black with warmth
+    "MUTED":   "#5C6675",   # readable secondary text (4.5:1 on white)
+    "INPUT":   "#FFFFFF",   # input field background
+    "HINT":    "#9CA3AF",   # placeholder text
+    "BTN_TEXT":"#FFFFFF",   # text on colored buttons (white on accent)
+    "DIS_BG":  "#E5E2DB",   # disabled background
+    "DIS_FG":  "#A8A29E",   # disabled text
+}
+
+# Tone helpers - used to build subtle variations of the active palette
+def _hex_to_rgb(h: str) -> tuple[int, int, int]:
+    h = h.lstrip("#")
+    return int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
+
+def _rgb_to_hex(r: int, g: int, b: int) -> str:
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+def _mix(a: str, b: str, t: float) -> str:
+    """Linear blend two hex colors. t=0 returns a, t=1 returns b."""
+    r1, g1, b1 = _hex_to_rgb(a)
+    r2, g2, b2 = _hex_to_rgb(b)
+    return _rgb_to_hex(
+        int(r1 + (r2 - r1) * t),
+        int(g1 + (g2 - g1) * t),
+        int(b1 + (b2 - b1) * t),
+    )
+
+
+# ── Active palette globals ────────────────────────────────────────
+# These are populated by `_load_theme()` below. They're plain module
+# globals so existing code (`bg=BG`, `fg=TEXT`, etc.) keeps working.
+
+BG = PANEL = CARD = BORDER = ""
+ACCENT = BLUE = GREEN = WARN = DANGER = PURPLE = ""
+TEXT = MUTED = INPUT = HINT = ""
+BTN_TEXT = SCAN_FG = STOP_FG = SAVE_FG = CLEAR_FG = BTN_FG = ""
+DIS_BG = DIS_FG = ""
+
+# Tracks current theme name: "dark" or "light"
+_CURRENT_THEME = "dark"
+
+
+def detect_system_theme() -> str:
+    """Best-effort detection of the OS appearance setting.
+
+    Returns "light" or "dark". Falls back to "dark" if detection fails -
+    most users in our target audience use dark mode anyway, and "dark"
+    is the historical default of this app.
+
+    macOS: reads `defaults read -g AppleInterfaceStyle` (returns "Dark"
+    if set, or fails with non-zero exit code if light)
+    Windows: reads HKCU registry AppsUseLightTheme
+    Linux:   reads GTK theme via gsettings (best-effort, many WMs)
+    """
+    import subprocess
+    try:
+        if sys.platform == "darwin":
+            r = subprocess.run(
+                ["defaults", "read", "-g", "AppleInterfaceStyle"],
+                capture_output=True, text=True, timeout=2,
+            )
+            return "dark" if r.returncode == 0 and "Dark" in r.stdout else "light"
+        if sys.platform == "win32":
+            import winreg
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize",
+            )
+            try:
+                value, _ = winreg.QueryValueEx(key, "AppsUseLightTheme")
+                return "light" if value == 1 else "dark"
+            finally:
+                winreg.CloseKey(key)
+        # Linux: try gsettings (works on GNOME, Cinnamon, others)
+        r = subprocess.run(
+            ["gsettings", "get", "org.gnome.desktop.interface", "color-scheme"],
+            capture_output=True, text=True, timeout=2,
+        )
+        if r.returncode == 0 and "dark" in r.stdout.lower():
+            return "dark"
+        if r.returncode == 0 and "light" in r.stdout.lower():
+            return "light"
+    except Exception:
+        pass
+    return "dark"
+
+
+def _load_theme(name: str) -> None:
+    """Populate the module-level color globals from a named palette.
+
+    Called at startup and on every theme switch. Does NOT touch any
+    Tk widgets - that's the job of `apply_theme()`."""
+    global BG, PANEL, CARD, BORDER, ACCENT, BLUE, GREEN, WARN, DANGER, PURPLE
+    global TEXT, MUTED, INPUT, HINT, BTN_TEXT, SCAN_FG, STOP_FG, SAVE_FG
+    global CLEAR_FG, BTN_FG, DIS_BG, DIS_FG, _CURRENT_THEME
+
+    palette = _THEME_LIGHT if name == "light" else _THEME_DARK
+    BG       = palette["BG"]
+    PANEL    = palette["PANEL"]
+    CARD     = palette["CARD"]
+    BORDER   = palette["BORDER"]
+    ACCENT   = palette["ACCENT"]
+    BLUE     = palette["BLUE"]
+    GREEN    = palette["GREEN"]
+    WARN     = palette["WARN"]
+    DANGER   = palette["DANGER"]
+    PURPLE   = palette["PURPLE"]
+    TEXT     = palette["TEXT"]
+    MUTED    = palette["MUTED"]
+    INPUT    = palette["INPUT"]
+    HINT     = palette["HINT"]
+    BTN_TEXT = palette["BTN_TEXT"]
+    DIS_BG   = palette["DIS_BG"]
+    DIS_FG   = palette["DIS_FG"]
+    # Legacy aliases - several call-sites use these names
+    SCAN_FG = STOP_FG = SAVE_FG = CLEAR_FG = BTN_FG = BTN_TEXT
+    _CURRENT_THEME = name
+
+
+def current_theme() -> str:
+    """Return the active theme name: 'dark' or 'light'."""
+    return _CURRENT_THEME
+
+
+# Pick initial theme:
+#   1. saved user preference in kevinnet_settings.json
+#   2. OS appearance setting
+#   3. dark (fallback)
+def _initial_theme() -> str:
+    try:
+        # Settings module is defined further up the file, so this works
+        s = load_settings()
+        pref = s.get("theme")
+        if pref in ("dark", "light"):
+            return pref
+        if pref == "system" or pref is None:
+            return detect_system_theme()
+    except Exception:
+        pass
+    return "dark"
+
+
+_load_theme(_initial_theme())
+
+
+def _remap_color(c: str) -> str | None:
+    """Given a color that may belong to either palette, return the
+    equivalent color in the currently-active palette.
+
+    Returns None if the input doesn't match any role color (in which
+    case the caller leaves the widget alone). Used by the live theme
+    switch to translate widget colors set under the old palette.
+    """
+    if not c or not c.startswith("#"):
+        return None
+    c = c.lower()
+    # Build a role lookup once: for every role, what are the possible
+    # color values across both palettes?
+    other = _THEME_LIGHT if _CURRENT_THEME == "dark" else _THEME_DARK
+    active = _THEME_LIGHT if _CURRENT_THEME == "light" else _THEME_DARK
+    # Reverse map: hex (lowercased) → role name
+    for role, val in other.items():
+        if val.lower() == c:
+            return active[role]
+    # Already in the active palette - no change needed
+    for role, val in active.items():
+        if val.lower() == c:
+            return val
+    return None
 
 # Legacy aliases kept for compatibility
 CONN_BG  = PURPLE
@@ -4066,20 +4262,20 @@ def FA(size=11, weight="normal"):
 #  HELP DIALOG
 # ═══════════════════════════════════════════════════════════════
 HELP = {
-    "fa": ("راهنمای استفاده — KevinNet DNS", [
+    "fa": ("راهنمای استفاده - KevinNet DNS", [
         ("KevinNet چیست؟",
          "KevinNet یک برنامه کاربر-پسند است که تانل DNS را برای شما راه‌اندازی می‌کند.\n"
          "تانل DNS اینترنت شما را از طریق یک سرور شخصی در خارج از ایران عبور می‌دهد\n"
          "بدون اینکه فیلترینگ DPI ایران بتواند آن را تشخیص دهد.\n\n"
          "دو موتور پشتیبانی می‌شود:\n"
-         "• MasterDNS — DNS tunnel با Resolver‌های متعدد، بهترین برای ایران\n"
-         "• VayDNS    — DNS tunnel با DoH/DoT/UDP، رمزنگاری Noise پروتکل"),
+         "• MasterDNS - DNS tunnel با Resolver‌های متعدد، بهترین برای ایران\n"
+         "• VayDNS    - DNS tunnel با DoH/DoT/UDP، رمزنگاری Noise پروتکل"),
 
         ("پیش‌نیاز: سرور و دامنه",
          "۱. یک VPS لینوکسی خارج از ایران (Hetzner، DigitalOcean و...)\n"
          "۲. یک دامنه با دو رکورد DNS:\n"
-         "   • رکورد A  — ns.yourdomain.com  →  IP سرور (glue record)\n"
-         "   • رکورد NS — v.yourdomain.com   →  ns.yourdomain.com\n"
+         "   • رکورد A  - ns.yourdomain.com  →  IP سرور (glue record)\n"
+         "   • رکورد NS - v.yourdomain.com   →  ns.yourdomain.com\n"
          "   دامنه تانل شما v.yourdomain.com می‌شود\n\n"
          "۳. نصب VPN روی سرور (راهنما در README)\n\n"
          "MasterDNS: بعد از نصب فایل encrypt_key.txt روی سرور دارید\n"
@@ -4094,7 +4290,7 @@ HELP = {
          "هر نوع فیلدهای خودش را نشان می‌دهد و فقط دکمه ذخیره همان نوع فعال می‌شود."),
 
         ("۲  نام کشور / پوشه را وارد کنید",
-         "یک نام دلخواه برای این پیکربندی — مثلاً  Iran  یا  Turkey\n"
+         "یک نام دلخواه برای این پیکربندی - مثلاً  Iran  یا  Turkey\n"
          "پوشه‌ای با این نام کنار برنامه ساخته می‌شود که:\n"
          "• فایل‌های تنظیمات VPN درون آن ذخیره می‌شود\n"
          "• فایل اجرایی VPN هم در همان پوشه کپی می‌شود\n"
@@ -4112,16 +4308,16 @@ HELP = {
          "این کلید باید دقیقاً با سرور مطابقت داشته باشد."),
 
         ("۵  تنظیمات اسکن را انتخاب کنید",
-         "هدف (Target): چند Resolver می‌خواهید — پیشنهاد: 100\n"
-         "همزمانی: بالاتر از 100 نروید در ایران — بهترین: 80\n"
-         "Timeout: شبکه‌های ایران کند — پیشنهاد: 3 ثانیه\n"
-         "پول: هر چه بیشتر، Resolver بیشتر — پیشنهاد: 200 (یعنی ۲۰۰ هزار IP)\n\n"
+         "هدف (Target): چند Resolver می‌خواهید - پیشنهاد: 100\n"
+         "همزمانی: بالاتر از 100 نروید در ایران - بهترین: 80\n"
+         "Timeout: شبکه‌های ایران کند - پیشنهاد: 3 ثانیه\n"
+         "پول: هر چه بیشتر، Resolver بیشتر - پیشنهاد: 200 (یعنی ۲۰۰ هزار IP)\n\n"
          "→ کم پیدا شد؟ Pool را به 300 یا 500 افزایش دهید\n"
-         "→ اسکن را 2-3 بار تکرار کنید — هر بار IP‌های مختلفی تست می‌شود"),
+         "→ اسکن را 2-3 بار تکرار کنید - هر بار IP‌های مختلفی تست می‌شود"),
 
         ("۶  روی ▶ شروع اسکن کلیک کنید",
          "مرحله ۱ (سریع): بررسی زنده بودن همه IP‌های پول\n"
-         "مرحله ۲ (دقیق): تست ۶ معیاره — ★6/6 ◆4-5 ▸2-3 ·0-1\n"
+         "مرحله ۲ (دقیق): تست ۶ معیاره - 6/6 4-5 2-3 ·0-1\n"
          "مرحله ۳ (واقعی): تأیید E2E از طریق باینری VPN\n\n"
          "نتایج رنگی معنایشان است: سبز = عالی، زرد = خوب، نارنجی = ضعیف"),
 
@@ -4134,13 +4330,13 @@ HELP = {
         ("۸  اتصال از تب پروفایل‌ها",
          "به تب MasterDNS Profiles یا VayDNS Profiles بروید.\n"
          "پروفایل ذخیره‌شده را از لیست انتخاب کنید.\n"
-         "روی 🚀 اتصال کلیک کنید — ترمینال باز می‌شود و VPN شروع به کار می‌کند.\n\n"
+         "روی 🚀 اتصال کلیک کنید - ترمینال باز می‌شود و VPN شروع به کار می‌کند.\n\n"
          "می‌توانید قبل از اتصال تنظیمات را تغییر داده و ذخیره کنید.\n"
          "با 📋 کپی می‌توانید از یک پروفایل چند نسخه با تنظیمات متفاوت داشته باشید."),
 
         ("🔧  مقادیر بهینه MasterDNS برای ایران",
-         "روش رمزنگاری:    1 — XOR          کمترین سربار در پکت‌های DNS\n"
-         "استراتژی بالانس: 3 — Least Loss   ایران افت پکت بالا دارد\n"
+         "روش رمزنگاری:    1 - XOR          کمترین سربار در پکت‌های DNS\n"
+         "استراتژی بالانس: 3 - Least Loss   ایران افت پکت بالا دارد\n"
          "تکرار بسته:      2 یا 3           افزونگی در شبکه پر افت\n"
          "Max Upload MTU:  80–100           query کوچک‌تر = کمتر DPI trigger\n"
          "Max Download MTU: 700            جلوگیری از fragmentation ISP\n"
@@ -4162,35 +4358,35 @@ HELP = {
          "۲. در نسخه کپی، یک تنظیم را تغییر دهید (مثلاً MTU)\n"
          "۳. هر دو را ذخیره کنید و هر کدام را تست کنید\n"
          "۴. نسخه بهتر را نگه دارید، بقیه را حذف کنید\n\n"
-         "برای MasterDNS می‌توانید اسکن را تکرار کنید — هر بار Resolverهای جدید"),
+         "برای MasterDNS می‌توانید اسکن را تکرار کنید - هر بار Resolverهای جدید"),
 
-        ("📁  پوشه‌های برنامه — مهم",
+        ("📁  پوشه‌های برنامه - مهم",
          "KevinNet همه پروفایل‌ها را در پوشه‌های خودش کنار برنامه ذخیره می‌کند:\n"
-         "• masterdns_profiles/ — پروفایل‌های MasterDNS\n"
-         "• vaydns_profiles/    — پروفایل‌های VayDNS\n"
-         "• Iran/ یا Turkey/    — فایل‌های اجرایی VPN\n\n"
+         "• masterdns_profiles/ - پروفایل‌های MasterDNS\n"
+         "• vaydns_profiles/    - پروفایل‌های VayDNS\n"
+         "• Iran/ یا Turkey/    - فایل‌های اجرایی VPN\n\n"
          "لطفاً این پوشه‌ها را دستی جابجا یا حذف نکنید.\n"
-         "برای دسترسی به همه پروفایل‌ها فقط برنامه را باز کنید —\n"
+         "برای دسترسی به همه پروفایل‌ها فقط برنامه را باز کنید -\n"
          "همه چیز در تب MasterDNS یا VayDNS Profiles قابل مشاهده است."),
-        ("مک — مشکل 'damaged' یا 'cannot be verified'",
+        ("مک - مشکل 'damaged' یا 'cannot be verified'",
          "در ترمینال این دو دستور را بزنید:\n"
          "chmod +x KevinNet_macOS_Universal\n"
          "xattr -d com.apple.quarantine KevinNet_macOS_Universal"),
     ]),
-    "en": ("How to use — KevinNet DNS", [
+    "en": ("How to use - KevinNet DNS", [
         ("What is KevinNet?",
          "KevinNet is a user-friendly app that sets up a DNS tunnel for you.\n"
          "A DNS tunnel routes your internet through a personal server outside Iran\n"
          "without Iran's DPI filtering being able to detect or block it.\n\n"
          "Two engines are supported:\n"
-         "• MasterDNS — DNS tunnel with multiple resolvers, best for Iran\n"
-         "• VayDNS    — DNS tunnel with DoH/DoT/UDP, Noise protocol encryption"),
+         "• MasterDNS - DNS tunnel with multiple resolvers, best for Iran\n"
+         "• VayDNS    - DNS tunnel with DoH/DoT/UDP, Noise protocol encryption"),
 
         ("Prerequisite: server and domain",
          "1. A Linux VPS outside Iran (Hetzner, DigitalOcean, etc.)\n"
          "2. A domain with two DNS records:\n"
-         "   • A record  — ns.yourdomain.com  →  your server IP  (glue)\n"
-         "   • NS record — v.yourdomain.com   →  ns.yourdomain.com\n"
+         "   • A record  - ns.yourdomain.com  →  your server IP  (glue)\n"
+         "   • NS record - v.yourdomain.com   →  ns.yourdomain.com\n"
          "   Your tunnel domain is v.yourdomain.com\n\n"
          "3. VPN server installed on the VPS (see README for guides)\n\n"
          "MasterDNS: after install you have encrypt_key.txt on the server\n"
@@ -4205,7 +4401,7 @@ HELP = {
          "Each type shows its own fields. Only the matching save button is active."),
 
         ("2  Enter country / folder name",
-         "Any name for this configuration — e.g.  Iran  or  Turkey\n"
+         "Any name for this configuration - e.g.  Iran  or  Turkey\n"
          "A folder with this name is created next to the app, containing:\n"
          "• The VPN config files\n"
          "• A copy of the VPN binary\n"
@@ -4223,16 +4419,16 @@ HELP = {
          "This must match the server exactly."),
 
         ("5  Choose scan settings",
-         "Target: how many resolvers to find — recommended: 100\n"
-         "Concurrency: do not go above 100 inside Iran — best: 80\n"
-         "Timeout: Iranian networks are slow — recommended: 3s\n"
-         "Pool ×1000: more IPs scanned = more resolvers found — try: 200\n\n"
+         "Target: how many resolvers to find - recommended: 100\n"
+         "Concurrency: do not go above 100 inside Iran - best: 80\n"
+         "Timeout: Iranian networks are slow - recommended: 3s\n"
+         "Pool ×1000: more IPs scanned = more resolvers found - try: 200\n\n"
          "→ Finding very few? Increase Pool to 300 or 500\n"
-         "→ Run 2-3 times — each run tests different IPs"),
+         "→ Run 2-3 times - each run tests different IPs"),
 
         ("6  Click ▶ Start Scan",
          "Phase 1 (fast): alive check on all IPs in the pool\n"
-         "Phase 2 (deep): 6-check scoring — ★6/6 ◆4-5 ▸2-3 ·0-1\n"
+         "Phase 2 (deep): 6-check scoring - 6/6 4-5 2-3 ·0-1\n"
          "Phase 3 (real): E2E tunnel test via the VPN binary\n\n"
          "Green = excellent, Yellow = good, Orange = weak"),
 
@@ -4245,13 +4441,13 @@ HELP = {
         ("8  Connect from the Profiles tab",
          "Go to the MasterDNS Profiles or VayDNS Profiles tab.\n"
          "Select your saved profile from the list.\n"
-         "Click 🚀 Launch VPN — a terminal opens and the VPN starts.\n\n"
+         "Click 🚀 Launch VPN - a terminal opens and the VPN starts.\n\n"
          "You can edit settings before launching and save the changes.\n"
          "Use 📋 Duplicate to make copies with different settings for A/B testing."),
 
         ("🔧  MasterDNS optimal values for Iran",
-         "Encryption Method:    1 — XOR          lowest overhead in DNS packets\n"
-         "Balancing Strategy:   3 — Least Loss    Iran has high packet loss\n"
+         "Encryption Method:    1 - XOR          lowest overhead in DNS packets\n"
+         "Balancing Strategy:   3 - Least Loss    Iran has high packet loss\n"
          "Packet Duplication:   2 or 3            redundancy on lossy paths\n"
          "Max Upload MTU:       80–100            smaller queries = less DPI trigger\n"
          "Max Download MTU:     700               avoids ISP fragmentation\n"
@@ -4273,22 +4469,167 @@ HELP = {
          "2. In the copy, change one setting (e.g. Max Upload MTU)\n"
          "3. Save both and test each one\n"
          "4. Keep the better one, delete the rest\n\n"
-         "For MasterDNS, repeat the scan to get fresh resolvers — each run finds different IPs."),
+         "For MasterDNS, repeat the scan to get fresh resolvers - each run finds different IPs."),
 
-        ("📁  App folders — important",
+        ("📁  App folders - important",
          "KevinNet stores all profiles in folders next to the app:\n"
-         "• masterdns_profiles/ — MasterDNS profiles\n"
-         "• vaydns_profiles/    — VayDNS profiles\n"
-         "• Iran/ or Turkey/    — VPN output files\n\n"
+         "• masterdns_profiles/ - MasterDNS profiles\n"
+         "• vaydns_profiles/    - VayDNS profiles\n"
+         "• Iran/ or Turkey/    - VPN output files\n\n"
          "Do not move or delete these folders manually.\n"
-         "To access all your profiles, just open the app —\n"
+         "To access all your profiles, just open the app -\n"
          "everything is visible in the MasterDNS or VayDNS Profiles tab."),
-        ("macOS — 'damaged' or 'cannot be verified' error",
+        ("macOS - 'damaged' or 'cannot be verified' error",
          "Run these two commands in Terminal:\n"
          "chmod +x KevinNet_macOS_Universal\n"
          "xattr -d com.apple.quarantine KevinNet_macOS_Universal"),
     ]),
 }
+
+
+# ─── HTML help file ────────────────────────────────────────────
+# Generates a self-contained `help.html` next to the app and opens it
+# in the default browser. Better than a cramped Tk dialog because:
+#   - Browser handles long content (scrolling, find-on-page, zoom)
+#   - Easy to copy/paste server setup commands
+#   - User can keep it open on a second monitor while using the app
+#   - Mobile-friendly if they screenshot and view on phone
+#
+# The HTML inlines all CSS/JS so it works offline. It matches the
+# active theme palette so it doesn't feel disconnected from the app.
+
+def _build_help_html(lang: str = "en") -> str:
+    """Build the help HTML string using current theme colors and HELP data."""
+    import html as _html
+
+    fa = lang == "fa"
+    title, steps = HELP[lang]
+
+    # Sections rendered as cards
+    cards_html = []
+    for sec_title, sec_body in steps:
+        # Convert plain text body to HTML: preserve newlines, escape entities
+        body_html = _html.escape(sec_body).replace("\n", "<br>")
+        cards_html.append(f"""
+        <section class="card">
+            <h2>{_html.escape(sec_title)}</h2>
+            <div class="body">{body_html}</div>
+        </section>""")
+
+    direction = "rtl" if fa else "ltr"
+    text_align = "right" if fa else "left"
+    lang_attr = "fa" if fa else "en"
+
+    # Use the current palette - help page matches the app's theme
+    css = f"""
+        :root {{
+            --bg:      {BG};
+            --card:    {CARD};
+            --border:  {BORDER};
+            --text:    {TEXT};
+            --muted:   {MUTED};
+            --accent:  {ACCENT};
+            --panel:   {PANEL};
+        }}
+        * {{ box-sizing: border-box; }}
+        body {{
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                         "Noto Sans", "Vazirmatn", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0; padding: 0;
+            line-height: 1.7;
+            direction: {direction};
+            text-align: {text_align};
+        }}
+        header {{
+            background: var(--panel);
+            border-bottom: 1px solid var(--border);
+            padding: 28px 32px;
+            position: sticky; top: 0;
+            backdrop-filter: blur(8px);
+        }}
+        header h1 {{
+            margin: 0; font-size: 24px; color: var(--accent);
+        }}
+        header .sub {{
+            color: var(--muted); font-size: 14px; margin-top: 4px;
+        }}
+        main {{
+            max-width: 880px;
+            margin: 0 auto;
+            padding: 24px 32px 80px;
+        }}
+        .card {{
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 22px 26px;
+            margin-bottom: 16px;
+        }}
+        .card h2 {{
+            margin: 0 0 12px 0;
+            color: var(--accent);
+            font-size: 17px;
+            font-weight: 600;
+        }}
+        .card .body {{
+            color: var(--text);
+            font-size: 15px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }}
+        a {{ color: var(--accent); }}
+        footer {{
+            text-align: center;
+            color: var(--muted);
+            font-size: 12px;
+            padding: 24px;
+            border-top: 1px solid var(--border);
+        }}
+        /* Print friendly */
+        @media print {{
+            header {{ position: static; }}
+            .card {{ break-inside: avoid; page-break-inside: avoid; }}
+        }}
+    """
+
+    head_sub = ("راهنمای کامل برنامه" if fa else
+                "Complete user guide and troubleshooting")
+    footer = (f"KevinNet DNS v{__version__}  -  kevinhaji.com")
+
+    return f"""<!DOCTYPE html>
+<html lang="{lang_attr}" dir="{direction}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{_html.escape(title)}</title>
+    <style>{css}</style>
+</head>
+<body>
+    <header>
+        <h1>{_html.escape(title)}</h1>
+        <div class="sub">{_html.escape(head_sub)}</div>
+    </header>
+    <main>{''.join(cards_html)}</main>
+    <footer>{_html.escape(footer)}</footer>
+</body>
+</html>"""
+
+
+def open_help_html(lang: str = "en") -> Path:
+    """Write help.html next to the app and open it in the default browser.
+
+    Returns the path where the file was written. Falls back to the
+    Tk dialog (`show_help`) if writing or opening fails."""
+    import webbrowser
+    out = app_dir() / "help.html"
+    out.write_text(_build_help_html(lang), encoding="utf-8")
+    try:
+        webbrowser.open_new_tab(out.as_uri())
+    except Exception:
+        pass
+    return out
 
 
 def show_help(parent, lang, *, allow_dismiss: bool = False):
@@ -4297,7 +4638,7 @@ def show_help(parent, lang, *, allow_dismiss: bool = False):
     When `allow_dismiss=True` a "don't show again" checkbox is shown, and
     ticking it persists `help_dismissed=True` in settings so the dialog
     doesn't auto-open on the next launch. The checkbox is hidden when the
-    user explicitly opens the help (header button) — they obviously want
+    user explicitly opens the help (header button) - they obviously want
     to see it then.
     """
     title, steps = HELP[lang]
@@ -4370,7 +4711,7 @@ def show_help(parent, lang, *, allow_dismiss: bool = False):
     btn_row = tk.Frame(d, bg=PANEL)
     btn_row.pack(fill="x", pady=14)
 
-    # "Don't show again" — only on the auto-open at startup
+    # "Don't show again" - only on the auto-open at startup
     dismiss_var = tk.BooleanVar(value=False)
     if allow_dismiss:
         cb_text = ("دیگر نشان نده" if lang == "fa"
@@ -4411,7 +4752,7 @@ def show_help(parent, lang, *, allow_dismiss: bool = False):
 
 
 # ═══════════════════════════════════════════════════════════════
-#  PROFILES — persist scan results + key config options
+#  PROFILES - persist scan results + key config options
 # ═══════════════════════════════════════════════════════════════
 
 PROFILE_DEFAULTS: dict = {
@@ -4427,12 +4768,12 @@ PROFILE_DEFAULTS: dict = {
 }
 
 ENC_LABELS = [
-    "0 — None", "1 — XOR", "2 — ChaCha20",
-    "3 — AES-128-GCM", "4 — AES-192-GCM", "5 — AES-256-GCM",
+    "0 - None", "1 - XOR", "2 - ChaCha20",
+    "3 - AES-128-GCM", "4 - AES-192-GCM", "5 - AES-256-GCM",
 ]
 BAL_LABELS = [
-    "1 — Random", "2 — Round Robin",
-    "3 — Least Loss", "4 — Lowest Latency",
+    "1 - Random", "2 - Round Robin",
+    "3 - Least Loss", "4 - Lowest Latency",
 ]
 LOG_LABELS = ["DEBUG", "INFO", "WARN", "ERROR"]
 
@@ -4497,7 +4838,7 @@ def _profile_filename(safe_stem: str, prefix: str = "") -> str:
 def _write_profile_json(path: Path, profile: dict):
     """Write a profile JSON with restrictive permissions (Unix).
 
-    Profiles may contain the MasterDNS shared encryption key — limit read
+    Profiles may contain the MasterDNS shared encryption key - limit read
     access to the current user. On Windows, the user-profile ACLs already
     restrict this; on Unix the default umask is too permissive.
     """
@@ -4542,7 +4883,7 @@ def _toml_str_escape(value: str) -> str:
 
     TOML basic strings use the same escape syntax as JSON for double quotes,
     backslashes, and control characters. Routing through json.dumps and then
-    stripping the surrounding quotes gives us a reliable escape — TOML is a
+    stripping the surrounding quotes gives us a reliable escape - TOML is a
     superset of this part of JSON's string spec.
     """
     import json as _json
@@ -4552,7 +4893,7 @@ def _toml_str_escape(value: str) -> str:
 def build_config_from_profile(profile: dict) -> str:
     opts = {**PROFILE_DEFAULTS, **profile.get("options", {})}
     ts   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    # Domain and key go inside TOML strings — escape special characters so a
+    # Domain and key go inside TOML strings - escape special characters so a
     # stray " or \ in user input doesn't break the resulting client_config.toml
     domain = _toml_str_escape(profile.get("domain", ""))
     key    = _toml_str_escape(profile.get("key", ""))
@@ -4575,7 +4916,7 @@ def write_profile_files(profile: dict):
     config_path.write_text(
         build_config_from_profile(profile), encoding="utf-8"
     )
-    # Config contains the shared encryption key — restrict file permissions
+    # Config contains the shared encryption key - restrict file permissions
     # so other users on the machine can't read it (Unix only; Windows ACLs
     # default to the user's profile being unreadable by other users anyway).
     if sys.platform != "win32":
@@ -4648,7 +4989,7 @@ VAYDNS_DEFAULTS: dict = {
 
 # Iran-recommended VayDNS defaults (shown as hints in the UI)
 VAYDNS_IRAN_HINTS: dict = {
-    "max_qname_len":    "101  (default — safe for most resolvers)",
+    "max_qname_len":    "101  (default - safe for most resolvers)",
     "idle_timeout":     "10s  (increase to 30s if you see frequent reconnects)",
     "keepalive":        "2s   (keep well below idle_timeout)",
     "record_type":      "txt  (most compatible under DPI)",
@@ -4658,9 +4999,9 @@ VAYDNS_IRAN_HINTS: dict = {
 }
 
 VAYDNS_TRANSPORT_LABELS = [
-    "udp — Plaintext UDP  (port 53)",
-    "doh — DNS over HTTPS",
-    "dot — DNS over TLS   (port 853)",
+    "udp - Plaintext UDP  (port 53)",
+    "doh - DNS over HTTPS",
+    "dot - DNS over TLS   (port 853)",
 ]
 VAYDNS_RECORD_LABELS = ["txt", "null", "cname", "a", "aaaa", "ns", "mx"]
 VAYDNS_LOG_LABELS    = ["debug", "info", "warning", "error"]
@@ -4720,7 +5061,7 @@ def build_vaydns_command(profile: dict, resolver: str,
     falling back to the generic name. Pass it explicitly when you already
     know the copied filename.
 
-    Pubkey and domain come from user input — quote them via shlex on Unix
+    Pubkey and domain come from user input - quote them via shlex on Unix
     so a stray space or quote in user paste can't break the command or
     inject an extra flag. On Windows the same script runs in cmd.exe which
     uses different quoting; for now we rely on input validation there.
@@ -4735,7 +5076,7 @@ def build_vaydns_command(profile: dict, resolver: str,
     listen    = f"127.0.0.1:{opts['listen_port']}"
 
     if sys.platform != "win32":
-        # Defence in depth — input validation should already reject bad chars
+        # Defence in depth - input validation should already reject bad chars
         # but shlex.quote guarantees no shell-meta surprises.
         pubkey_q = _shlex.quote(pubkey)
         domain_q = _shlex.quote(domain)
@@ -4806,7 +5147,7 @@ def write_vaydns_launch_script(profile: dict) -> Path:
     custom_resolver = opts.get("custom_resolver", "").strip()
     if transport == "udp":
         if custom_resolver:
-            # User specified a single resolver — use only that
+            # User specified a single resolver - use only that
             resolver_addrs = [
                 custom_resolver if ":" in custom_resolver else f"{custom_resolver}:53"
             ]
@@ -4830,7 +5171,7 @@ def write_vaydns_launch_script(profile: dict) -> Path:
     # Now create folder and copy binary
     folder.mkdir(parents=True, exist_ok=True)
 
-    # Copy vaydns-client binary if present — keep arch-specific name
+    # Copy vaydns-client binary if present - keep arch-specific name
     bin_src = get_vaydns_exe()
     bin_copy_error = None
     if bin_src:
@@ -4857,19 +5198,19 @@ def write_vaydns_launch_script(profile: dict) -> Path:
     if sys.platform != "win32":
         lines = [
             "#!/bin/bash",
-            "# Auto-generated by KevinNet DNS — VayDNS launcher",
+            "# Auto-generated by KevinNet DNS - VayDNS launcher",
             f"# Profile: {profile.get('name','')}",
             f"# Domain:  {profile.get('domain','')}",
             f"# Transport: {transport}",
             "#",
             "# NOTE: These resolvers were scanned from inside Iran.",
-            "# They are Iranian public DNS servers — they only work correctly",
+            "# They are Iranian public DNS servers - they only work correctly",
             "# when connecting FROM inside Iran. Testing from outside Iran",
             "# (Australia, Europe, etc.) will show NXDOMAIN and handshake",
             "# timeouts because the resolvers can't reach your tunnel server",
             "# from that network path.",
             "",
-            "# Trap Ctrl+C and termination signals — kill the background",
+            "# Trap Ctrl+C and termination signals - kill the background",
             "# vaydns-client process so it doesn't become a zombie.",
             "VD_PID=",
             "cleanup() {",
@@ -4879,24 +5220,24 @@ def write_vaydns_launch_script(profile: dict) -> Path:
             "trap cleanup INT TERM",
             "",
         ]
-        # The fallthrough loop is transport-agnostic — build_vaydns_command
+        # The fallthrough loop is transport-agnostic - build_vaydns_command
         # picks the right -udp/-doh/-dot flag from profile["options"]["transport"].
         # Use the multi-resolver loop whenever we have 2+ endpoints, regardless
         # of transport. Single-endpoint case takes a simpler direct-run path.
         if transport in ("udp", "doh", "dot"):
-            # Reject empty resolver list early — happens if no scan was run
+            # Reject empty resolver list early - happens if no scan was run
             # and no custom_resolver was set for DoH/DoT.
             if not resolver_addrs or resolver_addrs == [""]:
-                lines += [f'echo "ERROR: no {transport} resolver configured — run a scan or set custom_resolver in the VayDNS Profiles tab"']
+                lines += [f'echo "ERROR: no {transport} resolver configured - run a scan or set custom_resolver in the VayDNS Profiles tab"']
             elif len(resolver_addrs) == 1:
-                # Single resolver — run directly, let vaydns-client handle retries
+                # Single resolver - run directly, let vaydns-client handle retries
                 lines += [
                     f'echo "[vaydns] using {transport.upper()} resolver: {resolver_addrs[0]}"',
                     build_vaydns_command(profile, resolver_addrs[0], sh_bin_name),
                 ]
             else:
-                # Multiple resolvers — fall through on failure or timeout.
-                # vaydns-client NEVER exits on its own — it retries the same resolver
+                # Multiple resolvers - fall through on failure or timeout.
+                # vaydns-client NEVER exits on its own - it retries the same resolver
                 # forever with exponential back-off. We run each as a background
                 # process and kill it after RESOLVER_TIMEOUT seconds if it hasn't
                 # stayed connected. No external tools (timeout/gtimeout) needed.
@@ -4922,7 +5263,7 @@ def write_vaydns_launch_script(profile: dict) -> Path:
                     "  done",
                     "",
                     "  if kill -0 $VD_PID 2>/dev/null; then",
-                    '    # Still running after timeout — resolver is stuck, kill and try next',
+                    '    # Still running after timeout - resolver is stuck, kill and try next',
                     '    echo "[vaydns] ✗ resolver $RESOLVER stuck for ${RESOLVER_TIMEOUT}s, trying next..."',
                     "    kill $VD_PID 2>/dev/null",
                     "    wait $VD_PID 2>/dev/null",
@@ -4937,11 +5278,11 @@ def write_vaydns_launch_script(profile: dict) -> Path:
                     "  fi",
                     "done",
                     "",
-                    'echo "[vaydns] all resolvers exhausted — check your pubkey, domain, and server"',
+                    'echo "[vaydns] all resolvers exhausted - check your pubkey, domain, and server"',
                     "exit 1",
                 ]
         else:
-            # Unknown transport — defensive fallback
+            # Unknown transport - defensive fallback
             lines += [f'echo "ERROR: unknown transport: {transport}"']
 
         script_path = folder / "run.sh"
@@ -4952,7 +5293,7 @@ def write_vaydns_launch_script(profile: dict) -> Path:
     # --- Batch script (Windows) ---
     lines = [
         "@echo off",
-        "REM Auto-generated by KevinNet DNS — VayDNS launcher",
+        "REM Auto-generated by KevinNet DNS - VayDNS launcher",
         f"REM Profile: {profile.get('name','')}",
         f"REM Transport: {transport}",
         "",
@@ -4966,7 +5307,7 @@ def write_vaydns_launch_script(profile: dict) -> Path:
         else:
             # Windows: run sequentially, vaydns exits non-zero on failure.
             # The user can re-run the script to try the next resolver.
-            # Same loop shape for any transport — build_vaydns_command picks
+            # Same loop shape for any transport - build_vaydns_command picks
             # the right -udp/-doh/-dot flag based on profile options.
             lines += [
                 f"SET RESOLVER_TIMEOUT={opts.get('resolver_timeout', 60)}",
@@ -5052,7 +5393,7 @@ def get_vaydns_exe() -> Path | None:
             p = d / fname
             if p.exists():
                 return p
-        # 2. Glob fallback — catch naming variants, but only for the right platform
+        # 2. Glob fallback - catch naming variants, but only for the right platform
         for p in sorted(d.glob("vaydns-client*")):
             name_lower = p.name.lower()
             if p.suffix in (".zip", ".gz", ".tar", ".txt", ".md", ".json"):
@@ -5086,11 +5427,11 @@ class App(tk.Tk):
         super().__init__()
         self.title("KevinNet DNS")
         self.configure(bg=BG)
-        self.minsize(900, 680)   # minimum — all buttons always visible
+        self.minsize(900, 680)   # minimum - all buttons always visible
 
         self._lang      = "fa"
         self._found_ips : list[str] = []
-        # DoH/DoT scan results — kept separate from _found_ips (which is
+        # DoH/DoT scan results - kept separate from _found_ips (which is
         # UDP IP addresses) because they need a different transport flag
         # at launch time. Save logic creates one profile per transport found.
         self._doh_found : list[str] = []
@@ -5122,7 +5463,7 @@ class App(tk.Tk):
         self.after(100, self._poll_q)     # start polling queue
         # Auto-open the help dialog unless the user previously ticked
         # "don't show again". When opened from the header button later
-        # the checkbox isn't shown — they obviously want help then.
+        # the checkbox isn't shown - they obviously want help then.
         if not load_settings().get("help_dismissed", False):
             self.after(700, lambda: show_help(self, self._lang, allow_dismiss=True))
 
@@ -5150,7 +5491,7 @@ class App(tk.Tk):
             pass
 
     def _set_icon(self):
-        """Embed app icon from base64 — works on all platforms."""
+        """Embed app icon from base64 - works on all platforms."""
         try:
             import base64, io
             from PIL import Image, ImageTk
@@ -5184,7 +5525,7 @@ class App(tk.Tk):
         pass   # window is maximized; kept for compatibility
 
     def _poll_q(self):
-        """Drain result queue on main thread — fully thread-safe."""
+        """Drain result queue on main thread - fully thread-safe."""
         try:
             while True:
                 item = self._q.get_nowait()
@@ -5202,7 +5543,7 @@ class App(tk.Tk):
                     _, msg = item
                     self._log(msg)
                 elif kind == "e2e_res":
-                    # E2E verified resolver — highlight purple in tree
+                    # E2E verified resolver - highlight purple in tree
                     _, ip, score, ms, detail = item
                     W = self._W
                     for row in W["tree"].get_children():
@@ -5235,14 +5576,14 @@ class App(tk.Tk):
                     self._W["badge"].config(
                         text=f"{n}  {'تأیید E2E' if fa else 'E2E verified'}")
                     self._W["status_lbl"].config(
-                        text=f"● {'کامل' if fa else 'Done'}  —  {n} {'تأیید شده' if fa else 'E2E verified'}",
+                        text=f"● {'کامل' if fa else 'Done'}  -  {n} {'تأیید شده' if fa else 'E2E verified'}",
                         fg=GREEN)
                     self._log(
                         f"{'✓ مرحله ۳ کامل:' if fa else '✓ Phase 3 done:'} "
                         f"{n} {'resolver تأیید E2E شده' if fa else 'E2E-verified resolvers'} "
                         f"{'آماده ذخیره هستند' if fa else 'ready to save'}")
                 elif kind == "doh_res":
-                    # DoH endpoint responded — show as a teal row with a 🔒 icon
+                    # DoH endpoint responded - show as a teal row with a 🔒 icon
                     _, endpoint, ms = item
                     self._doh_found.append(endpoint)
                     self._W["tree"].insert(
@@ -5281,7 +5622,7 @@ class App(tk.Tk):
                             disabledforeground=DIS_FG)
                     self._W["status_lbl"].config(
                         text=f"● {'DoH/DoT کامل' if fa else 'DoH/DoT done'}"
-                             f"  —  {found}/{tested} reachable",
+                             f"  -  {found}/{tested} reachable",
                         fg=GREEN)
                     self._log(
                         f"{'✓ DoH/DoT کامل:' if fa else '✓ DoH/DoT done:'} "
@@ -5289,7 +5630,7 @@ class App(tk.Tk):
                     # Hint the user about what to do next
                     if self._doh_found or self._dot_found:
                         self._log(
-                            "💡 " + ("روی «💾 ذخیره در VayDNS Profiles» کلیک کنید تا یک پروفایل ساخته شود"
+                            "" + ("روی «💾 ذخیره در VayDNS Profiles» کلیک کنید تا یک پروفایل ساخته شود"
                                      if fa else
                                      "Click 💾 Save to VayDNS Profiles to create a profile from these endpoints"))
 
@@ -5318,7 +5659,7 @@ class App(tk.Tk):
         btn_fr.pack(side="right", padx=16)
 
         def top_btn(parent, wkey, text, fg_c, command):
-            """Label-based button — reliable on macOS and Windows alike."""
+            """Label-based button - reliable on macOS and Windows alike."""
             fr = tk.Frame(parent, bg=BORDER,
                           highlightbackground=BORDER, highlightthickness=1)
             fr.pack(side="right", padx=(6, 0))
@@ -5335,7 +5676,13 @@ class App(tk.Tk):
             W[wkey] = lbl
 
         top_btn(btn_fr, "btn_help", "؟  راهنما",
-                TEXT, lambda: show_help(self, self._lang))
+                TEXT, lambda: open_help_html(self._lang))
+        # Theme toggle: shows sun glyph when in dark mode (click to go light),
+        # moon glyph when in light mode (click to go dark). Persists choice
+        # in kevinnet_settings.json so next launch matches.
+        top_btn(btn_fr, "btn_theme",
+                "☀" if current_theme() == "dark" else "☾",
+                TEXT, self._toggle_theme)
         top_btn(btn_fr, "btn_lang", "English",
                 ACCENT, self._toggle_lang)
 
@@ -5362,7 +5709,7 @@ class App(tk.Tk):
 
         tk.Frame(self, bg=BORDER, height=1).pack(fill="x")
 
-        # ── CONTENT AREA — three views, only one shown at a time ─
+        # ── CONTENT AREA - three views, only one shown at a time ─
         self._scanner_view    = tk.Frame(self, bg=BG)
         self._profiles_view   = tk.Frame(self, bg=BG)
         self._vd_profiles_view = tk.Frame(self, bg=BG)
@@ -5370,7 +5717,7 @@ class App(tk.Tk):
         # ── Scanner view (original layout) ───────────────────────
         body = self._scanner_view
 
-        # Scrollable left panel — buttons always accessible even on small screens
+        # Scrollable left panel - buttons always accessible even on small screens
         left_outer = tk.Frame(body, bg=BG, width=420)
         left_outer.pack(side="left", fill="y", padx=(12, 6), pady=10)
         left_outer.pack_propagate(False)
@@ -5423,10 +5770,20 @@ class App(tk.Tk):
         self._build_profiles_tab(self._profiles_view)
         self._build_vd_profiles_tab(self._vd_profiles_view)
 
+        # Apply the default VPN mode reshape now that all widgets exist.
+        # Without this, the DoH/DoT button stays visible under MasterDNS
+        # mode on first launch - confusing because MasterDNS can't use it.
+        # The initial _vpn_mode StringVar defaults to "masterdns" so this
+        # call hides the encrypted-transports button at startup.
+        try:
+            self._set_vpn_mode(self._vpn_mode.get())
+        except Exception:
+            pass
+
         # Start on Scanner tab
         self._show_scanner()
 
-        # ── FOOTER — credit in ONE place only ──
+        # ── FOOTER - credit in ONE place only ──
         tk.Frame(self, bg=BORDER, height=1).pack(fill="x")
         footer = tk.Frame(self, bg=PANEL, height=36)
         footer.pack(fill="x")
@@ -5679,6 +6036,20 @@ class App(tk.Tk):
             self._select_profile(next(iter(self._profiles)))
 
     def _make_profile_row(self, parent, stem, p):
+        """Render one profile in the left-side list.
+
+        Sizing rationale: profile names can be 30+ characters (especially
+        with the "-DoH" / "-DoT" suffixes from v3.3.2 onwards), and the
+        metadata line can have 3-4 dot-separated parts. Without wrap or
+        padding, both get clipped on the right edge in narrow windows.
+
+        The fixes:
+          * ipady=4 on the row gives vertical breathing room
+          * info has padx=(12, 8) - more left padding for the selection bar
+          * name_lbl has wraplength so long names wrap to a second line
+            rather than being clipped
+          * metadata label also wraps and uses a smaller justify
+        """
         fa   = self._lang == "fa"
         name = p.get("name", stem)
         date = p.get("date", "")[:10]
@@ -5686,25 +6057,33 @@ class App(tk.Tk):
         launched_str = _format_last_launched(p.get("last_launched", ""), fa)
 
         row = tk.Frame(parent, bg=CARD, cursor="hand2")
-        row.pack(fill="x")
+        row.pack(fill="x", ipady=4)
         sel_bar = tk.Frame(row, bg=CARD, width=3)
         sel_bar.pack(side="left", fill="y")
         info = tk.Frame(row, bg=CARD)
-        info.pack(side="left", fill="x", expand=True, padx=8, pady=8)
+        info.pack(side="left", fill="both", expand=True, padx=(12, 12), pady=10)
+        # Name: wraps instead of clipping when very long.
+        # wraplength is set conservatively (matches the typical 280px
+        # left panel width minus padding).
         name_lbl = tk.Label(info, text=name, bg=CARD, fg=TEXT,
-                            font=F(12, "bold"), anchor="w")
+                            font=F(12, "bold"),
+                            anchor="w", justify="left",
+                            wraplength=240)
         name_lbl.pack(fill="x")
         # Compose subline: date · N resolvers · last launched X
         meta_parts = [date, f"{cnt} resolvers"]
         if launched_str:
             meta_parts.append(launched_str)
-        tk.Label(info, text="  ·  ".join(meta_parts),
-                 bg=CARD, fg=MUTED, font=F(10), anchor="w").pack(fill="x")
+        meta_lbl = tk.Label(info, text="  ·  ".join(meta_parts),
+                            bg=CARD, fg=MUTED, font=F(10),
+                            anchor="w", justify="left",
+                            wraplength=240)
+        meta_lbl.pack(fill="x", pady=(2, 0))
         tk.Frame(parent, bg=BORDER, height=1).pack(fill="x")
 
         def _on_click(e, s=stem):
             self._select_profile(s)
-        for w in (row, sel_bar, info, name_lbl):
+        for w in (row, sel_bar, info, name_lbl, meta_lbl):
             w.bind("<Button-1>", _on_click)
 
         row._stem     = stem
@@ -5842,7 +6221,7 @@ class App(tk.Tk):
             messagebox.showerror("", str(e))
             return
         self._saved_folder = folder
-        # Record the launch time on the profile JSON — used by the profile
+        # Record the launch time on the profile JSON - used by the profile
         # list to show "last launched X ago" so users can find their
         # current/active profile in a long list.
         try:
@@ -5890,7 +6269,7 @@ class App(tk.Tk):
                 self._log(
                     f"{'خطا در کپی پوشه:' if fa else 'Folder copy error:'} {e}")
         else:
-            # No folder yet — just write fresh files
+            # No folder yet - just write fresh files
             try:
                 write_profile_files(new_profile)
             except Exception as e:
@@ -6186,33 +6565,47 @@ class App(tk.Tk):
         self._vd_select_profile(target)
 
     def _vd_make_profile_row(self, parent, stem, p):
+        """Render one VayDNS profile in the left-side list.
+
+        Mirror of `_make_profile_row` with the same sizing fixes plus a
+        transport tag (udp/doh/dot) in the metadata line. The transport
+        rendering uses uppercase ("DoH", "DoT", "UDP") since lowercase
+        looks like a typo next to the other proper-noun parts.
+        """
         fa   = self._lang == "fa"
         name = p.get("name", stem)
         date = p.get("date", "")[:10]
         cnt  = p.get("resolver_count", len(p.get("resolvers", [])))
         opts = p.get("options", {})
-        transport = opts.get("transport", "udp")
+        # Render transport in proper case: DoH, DoT, UDP
+        raw_tx = (opts.get("transport") or "udp").lower()
+        transport_display = {"udp": "UDP", "doh": "DoH", "dot": "DoT"}.get(raw_tx, raw_tx.upper())
         launched_str = _format_last_launched(p.get("last_launched", ""), fa)
 
         row     = tk.Frame(parent, bg=CARD, cursor="hand2")
-        row.pack(fill="x")
+        row.pack(fill="x", ipady=4)
         sel_bar = tk.Frame(row, bg=CARD, width=3)
         sel_bar.pack(side="left", fill="y")
         info    = tk.Frame(row, bg=CARD)
-        info.pack(side="left", fill="x", expand=True, padx=8, pady=8)
+        info.pack(side="left", fill="both", expand=True, padx=(12, 12), pady=10)
         name_lbl = tk.Label(info, text=name, bg=CARD, fg=TEXT,
-                            font=F(12, "bold"), anchor="w")
+                            font=F(12, "bold"),
+                            anchor="w", justify="left",
+                            wraplength=240)
         name_lbl.pack(fill="x")
-        meta_parts = [date, f"{cnt} resolvers", transport]
+        meta_parts = [date, f"{cnt} resolvers", transport_display]
         if launched_str:
             meta_parts.append(launched_str)
-        tk.Label(info, text="  ·  ".join(meta_parts),
-                 bg=CARD, fg=MUTED, font=F(10), anchor="w").pack(fill="x")
+        meta_lbl = tk.Label(info, text="  ·  ".join(meta_parts),
+                            bg=CARD, fg=MUTED, font=F(10),
+                            anchor="w", justify="left",
+                            wraplength=240)
+        meta_lbl.pack(fill="x", pady=(2, 0))
         tk.Frame(parent, bg=BORDER, height=1).pack(fill="x")
 
         def _click(e, s=stem):
             self._vd_select_profile(s)
-        for w in (row, sel_bar, info, name_lbl):
+        for w in (row, sel_bar, info, name_lbl, meta_lbl):
             w.bind("<Button-1>", _click)
 
         row._stem = stem; row._sel_bar = sel_bar; row._name_lbl = name_lbl
@@ -6269,7 +6662,7 @@ class App(tk.Tk):
     def _vd_read_opt_vars(self) -> dict:
         vo = self._vd_popt_vars
         transport_str = vo["transport"].get()
-        transport_key = transport_str.split(" — ")[0].strip()
+        transport_key = transport_str.split(" - ")[0].strip()
         return {
             "transport":         transport_key,
             "custom_resolver":   vo["custom_resolver"].get().strip(),
@@ -6326,7 +6719,7 @@ class App(tk.Tk):
         if not script.exists():
             messagebox.showerror("", f"Script not found: {script}"); return
 
-        # Record launch time before doing the actual launch — useful even
+        # Record launch time before doing the actual launch - useful even
         # if the terminal opens and the user closes it quickly.
         try:
             p["last_launched"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -6365,7 +6758,7 @@ class App(tk.Tk):
         if not bin_in_folder:
             src_bin = get_vaydns_exe()
             if src_bin:
-                # Binary exists next to app but wasn't copied — copy it now
+                # Binary exists next to app but wasn't copied - copy it now
                 try:
                     import shutil as _sh2
                     dst = folder / src_bin.name
@@ -6492,31 +6885,59 @@ class App(tk.Tk):
 
     # ── VPN MODE SWITCH ──────────────────────────────────────────
     def _set_vpn_mode(self, mode: str):
-        """Switch between masterdns and vaydns mode in the scanner."""
+        """Switch between masterdns and vaydns mode in the scanner.
+
+        The panel reshapes so only the inputs and buttons relevant to the
+        current mode are visible:
+
+          MasterDNS mode:
+            - MasterDNS Encryption Key field shown
+            - VayDNS Public Key field hidden
+            - Start Scan button shown, Scan DoH/DoT button hidden
+              (MasterDNS doesn't support encrypted transports)
+            - Save to MasterDNS Profiles button shown
+
+          VayDNS mode:
+            - VayDNS Public Key field shown
+            - MasterDNS Encryption Key field hidden
+            - Both Start Scan AND Scan DoH/DoT buttons shown
+            - Save to VayDNS Profiles button shown
+        """
         self._vpn_mode.set(mode)
         W  = self._W
         fa = self._lang == "fa"
 
         if mode == "masterdns":
-            # Pill highlight
             W["pill_master"].config(bg=BLUE, fg="#000000")
             W["pill_vaydns"].config(bg=BORDER, fg=MUTED)
-            # Show MasterDNS key, hide VayDNS key
             self._vd_key_frame.pack_forget()
             self._md_key_frame.pack(fill="x")
-            # Show MasterDNS save button, hide VayDNS save
             W["btn_vd_save"].pack_forget()
             W["btn_save"].pack(fill="x", padx=2)
+            # Hide the encrypted-transports button: MasterDNS doesn't support it
+            if "btn_doh_scan_wrap" in W:
+                W["btn_doh_scan_wrap"].pack_forget()
+            # Mode hint
+            if "mode_hint" in W:
+                W["mode_hint"].config(
+                    text=("اسکن resolverهای UDP/53 ایرانی برای MasterDNS"
+                          if fa else
+                          "Scan Iranian UDP/53 resolvers for MasterDNS"))
         else:  # vaydns
-            # Pill highlight
             W["pill_master"].config(bg=BORDER, fg=MUTED)
             W["pill_vaydns"].config(bg=PURPLE, fg=BTN_TEXT)
-            # Show VayDNS key, hide MasterDNS key
             self._md_key_frame.pack_forget()
             self._vd_key_frame.pack(fill="x")
-            # Show VayDNS save button, hide MasterDNS save
             W["btn_save"].pack_forget()
             W["btn_vd_save"].pack(fill="x", padx=2)
+            # Show DoH/DoT scan button: VayDNS supports UDP, DoH and DoT
+            if "btn_doh_scan_wrap" in W:
+                W["btn_doh_scan_wrap"].pack(fill="x", pady=(0, 5))
+            if "mode_hint" in W:
+                W["mode_hint"].config(
+                    text=("Start Scan = resolverهای UDP/53  |  Scan DoH/DoT = endpointهای رمزنگاری شده"
+                          if fa else
+                          "Start Scan = UDP/53 resolvers  |  Scan DoH/DoT = encrypted endpoints"))
 
         # Reset scan state whenever mode changes
         self._found_ips.clear()
@@ -6607,6 +7028,17 @@ class App(tk.Tk):
         make_pill("pill_master", "MasterDNS", "MasterDNS", "masterdns")
         make_pill("pill_vaydns", "VayDNS",    "VayDNS",    "vaydns")
 
+        # Contextual hint that explains what the currently-selected mode does.
+        # Text is updated by _set_vpn_mode so the user always knows what
+        # Start Scan and Scan DoH/DoT will produce in this mode.
+        W["mode_hint"] = tk.Label(mode_frame,
+                                   text="",  # set by _set_vpn_mode
+                                   bg=CARD, fg=MUTED,
+                                   font=FA(9) if fa else F(9),
+                                   anchor="w", justify="left",
+                                   wraplength=320)
+        W["mode_hint"].pack(fill="x", pady=(2, 6))
+
         # ── MasterDNS key field (shown when masterdns selected) ──
         self._md_key_frame = tk.Frame(c1, bg=CARD)
         self._key_var = entry_field(
@@ -6614,7 +7046,7 @@ class App(tk.Tk):
             "MasterDNS Encryption Key",  "کلید رمزنگاری MasterDNS",
             "32-char key from server  (encrypt_key.txt)",
             "کلید ۳۲ کاراکتری از سرور  (فایل encrypt_key.txt)")
-        # Key frame packed AFTER country/domain — see _set_vpn_mode
+        # Key frame packed AFTER country/domain - see _set_vpn_mode
 
         # ── VayDNS key field (shown when vaydns selected) ────────
         self._vd_key_frame = tk.Frame(c1, bg=CARD)
@@ -6706,16 +7138,19 @@ class App(tk.Tk):
                           command=cmd)
             b.pack(fill="x", padx=2)
             W[wkey] = b
+            # Also store the wrapper frame so mode-switching can show/hide
+            # entire button rows (button + its vertical padding) cleanly.
+            W[wkey + "_wrap"] = wrapper
 
         mk_btn("btn_scan",    "▶  Start Scan",  "▶  شروع اسکن", ACCENT, SCAN_FG, self._start_scan)
         mk_btn("btn_stop",    "■  Stop",         "■  توقف",       DANGER, "#000000", self._stop_scan, "disabled")
-        # DoH/DoT scan — alternative encrypted transports. Slower but harder
-        # for Iranian DPI to fingerprint than plain UDP/53. Lower-key colour
-        # so the primary "Start Scan" remains visually dominant.
+        # DoH/DoT scan only makes sense for VayDNS (MasterDNS doesn't support
+        # encrypted transports). The wrapper frame is hidden by _set_vpn_mode
+        # when the user is in MasterDNS mode.
         mk_btn("btn_doh_scan", "🔒  Scan DoH/DoT", "🔒  اسکن DoH/DoT",
                PURPLE, BTN_TEXT, self._start_doh_dot_scan)
 
-        # Save button frame — only the active VPN mode's button is visible
+        # Save button frame - only the active VPN mode's button is visible
         self._save_btn_frame = tk.Frame(bf, bg=BG)
         self._save_btn_frame.pack(fill="x", pady=(0, 5))
 
@@ -6824,7 +7259,7 @@ class App(tk.Tk):
         vsb.pack(side="right", fill="y")
         W["tree"].pack(side="left", fill="both", expand=True)
 
-        # Right-click context menu — Copy IP, Copy all IPs, Open in browser.
+        # Right-click context menu - Copy IP, Copy all IPs, Open in browser.
         # Right-click on macOS is Button-2 (single-button mice) or Button-3
         # (multi-button + trackpad two-finger). Bind both.
         self._tree_menu = tk.Menu(self, tearoff=False, bg=CARD, fg=TEXT,
@@ -6870,6 +7305,104 @@ class App(tk.Tk):
     def _toggle_lang(self):
         self._lang = "en" if self._lang == "fa" else "fa"
         self._refresh_lang()
+
+    # ── THEME ───────────────────────────────────────────────────
+    def _toggle_theme(self):
+        """Flip between dark and light theme, live.
+
+        Persists the new preference so the next launch matches. We also
+        rewrite the toggle button glyph (sun in dark mode, moon in light
+        mode) so the icon tells the user what clicking does next."""
+        new_name = "light" if current_theme() == "dark" else "dark"
+        _load_theme(new_name)
+        try:
+            s = load_settings()
+            s["theme"] = new_name
+            save_settings(s)
+        except Exception:
+            pass
+        self._apply_theme_to_tree()
+        # Update the toggle glyph to point at the OTHER theme (the one
+        # clicking would switch to)
+        try:
+            self._W["btn_theme"].config(
+                text="☀" if new_name == "dark" else "☾",
+                bg=BORDER, fg=TEXT,
+            )
+        except Exception:
+            pass
+
+    def _apply_theme_to_tree(self):
+        """Walk the live Tk widget tree and re-apply colors from the
+        active palette.
+
+        This is necessarily imperfect because Tkinter doesn't have a
+        proper theme system - widget colors are stored at .config() time,
+        so we have to visit every widget and re-color it. Buttons keep
+        their semantic color (the Stop button stays red regardless of
+        theme); only background/text colors swap.
+
+        A handful of widgets reference colors that the walker can't
+        infer (e.g. a Label whose `fg` was set to ACCENT specifically).
+        For those, the visual will look correct after the next user
+        interaction repaints them, or after restart. The preference is
+        persisted so reopening always looks right.
+        """
+        # Recolor the root window
+        try:
+            self.configure(bg=BG)
+        except Exception:
+            pass
+
+        def _walk(widget):
+            try:
+                cls = widget.winfo_class()
+            except Exception:
+                return
+            try:
+                if cls in ("Frame", "Labelframe", "Toplevel", "Canvas"):
+                    cur_bg = str(widget.cget("bg"))
+                    # Map old palette → new palette by role inference.
+                    # If the widget's current bg matches one of our role
+                    # colors, swap to the corresponding new-palette color.
+                    new_bg = _remap_color(cur_bg)
+                    if new_bg:
+                        widget.configure(bg=new_bg)
+                elif cls == "Label":
+                    cur_bg = str(widget.cget("bg"))
+                    cur_fg = str(widget.cget("fg"))
+                    new_bg = _remap_color(cur_bg)
+                    new_fg = _remap_color(cur_fg)
+                    if new_bg: widget.configure(bg=new_bg)
+                    if new_fg: widget.configure(fg=new_fg)
+                elif cls == "Entry":
+                    widget.configure(bg=INPUT, fg=TEXT, insertbackground=TEXT,
+                                     highlightbackground=BORDER)
+                elif cls == "Text":
+                    widget.configure(bg=INPUT, fg=TEXT, insertbackground=TEXT,
+                                     highlightbackground=BORDER)
+                elif cls == "Button":
+                    # Map button bg only if it's a generic surface color.
+                    # Action-colored buttons (accent/danger/etc.) keep
+                    # their role color but we still need to refresh in
+                    # case the role color itself changed between palettes.
+                    cur_bg = str(widget.cget("bg"))
+                    cur_fg = str(widget.cget("fg"))
+                    new_bg = _remap_color(cur_bg)
+                    new_fg = _remap_color(cur_fg)
+                    if new_bg: widget.configure(bg=new_bg, activebackground=new_bg)
+                    if new_fg: widget.configure(fg=new_fg, activeforeground=new_fg)
+            except Exception:
+                # Some Ttk widgets reject `bg` etc.; that's fine
+                pass
+            try:
+                for child in widget.winfo_children():
+                    _walk(child)
+            except Exception:
+                pass
+
+        _walk(self)
+
 
     def _refresh_lang(self):
         fa = self._lang == "fa"
@@ -6942,9 +7475,9 @@ class App(tk.Tk):
             return
         ts   = datetime.now().strftime("%H:%M:%S")
         line = f"[{ts}]  {msg}\n"
-        if   msg.startswith("★"):                                    tag = "star"
-        elif msg.startswith("◆"):                                    tag = "diamond"
-        elif msg.startswith("▸"):                                    tag = "arrow"
+        if   msg.startswith(""):                                    tag = "star"
+        elif msg.startswith(""):                                    tag = "diamond"
+        elif msg.startswith(""):                                    tag = "arrow"
         elif any(x in msg for x in ("⚠","ERROR","error","خطا")):    tag = "warn"
         elif any(x in msg for x in ("E2E","Phase 3","مرحله ۳","تأیید E2E")): tag = "e2e"
         elif any(x in msg for x in ("Saved","ذخیره","copied","کپی","SUCCESS","SUCCESS")): tag = "star"
@@ -6970,7 +7503,7 @@ class App(tk.Tk):
         mode = self._vpn_mode.get()
 
         # Validate inputs upfront. Bad input here causes confusing TOML
-        # parse errors or silent failures later — much better to reject early.
+        # parse errors or silent failures later - much better to reject early.
         ok, err = validate_domain(domain)
         if not ok:
             messagebox.showwarning(
@@ -7048,7 +7581,7 @@ class App(tk.Tk):
         self._log(
             f"{'مرحله ۱: اسکن سریع  →  مرحله ۲: امتیازدهی (همه نشان داده می‌شن)  →  مرحله ۳: تأیید E2E واقعی' if fa else 'Phase 1: alive scan  →  Phase 2: scoring (all shown)  →  Phase 3: E2E real tunnel verify'}")
         self._log(
-            f"{'★=6/6  ◆=4-5  ▸=2-3  ·=0-1  — همه در مرحله E2E تست می‌شن' if fa else '★=6/6  ◆=4-5  ▸=2-3  ·=0-1  — all go to E2E phase, real tunnel is the final filter'}")
+            f"{'=6/6  =4-5  =2-3  ·=0-1  - همه در مرحله E2E تست می‌شن' if fa else '=6/6  =4-5  =2-3  ·=0-1  - all go to E2E phase, real tunnel is the final filter'}")
         self._log(
             f"{'تنظیمات:' if fa else 'Settings:'} "
             f"concurrency={conc}  timeout={timeout}s  target={target}")
@@ -7072,7 +7605,7 @@ class App(tk.Tk):
             # Try to raise the fd limit first.
             # IMPORTANT: safe_conc caps Phase 1. Phase 2 uses safe_conc // 4
             # internally (see run_scan). On Intel Macs, Phase 2 opens up to 6
-            # sockets per task — too high a cap causes kernel panics at 200k+
+            # sockets per task - too high a cap causes kernel panics at 200k+
             # pool sizes. 150 is the safe ceiling for Intel; ARM tolerates more.
             try:
                 import resource, platform as _plat
@@ -7088,7 +7621,7 @@ class App(tk.Tk):
         elif sys.platform == "win32":
             safe_conc = min(conc, 200)   # Windows handles more sockets
         else:
-            safe_conc = min(conc, 150)   # Linux — generous but safe
+            safe_conc = min(conc, 150)   # Linux - generous but safe
 
         safe_conc = max(safe_conc, 20)   # never go below 20
 
@@ -7134,15 +7667,15 @@ class App(tk.Tk):
         if "res_count" in self._W:
             self._W["res_count"].config(
                 text=f"{n} {'یافت‌شده' if fa else 'found'}")
-        # Color by score — all shown, sorted visually
+        # Color by score - all shown, sorted visually
         if score == 6:
-            tag, icon = "s6", "★"   # bright green  — perfect
+            tag, icon = "s6", ""   # bright green  - perfect
         elif score >= 4:
-            tag, icon = "s4", "◆"   # yellow        — good
+            tag, icon = "s4", ""   # yellow        - good
         elif score >= 2:
-            tag, icon = "s2", "▸"   # orange        — weak but possible
+            tag, icon = "s2", ""   # orange        - weak but possible
         else:
-            tag, icon = "s0", "·"   # muted         — very weak
+            tag, icon = "s0", "·"   # muted         - very weak
         self._W["tree"].insert("", "end",
                                values=(ip,
                                        f"{score}/{max_score}",
@@ -7164,7 +7697,7 @@ class App(tk.Tk):
         self._W["btn_scan"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
         self._W["btn_stop"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
         self._W["btn_save"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
-        self._log(f"{'اسکن DNS کامل شد — تست: ' if fa else 'DNS scan done — tested: '}{tested:,}  {'یافت: ' if fa else 'found: '}{found}")
+        self._log(f"{'اسکن DNS کامل شد - تست: ' if fa else 'DNS scan done - tested: '}{tested:,}  {'یافت: ' if fa else 'found: '}{found}")
 
         if found and not self._stop_ev.is_set():
             # Auto-start Phase 3 E2E immediately
@@ -7172,10 +7705,10 @@ class App(tk.Tk):
                 text=f"● {'مرحله ۳: تأیید واقعی تانل…' if fa else 'Phase 3: E2E tunnel verify…'}",
                 fg="#a78bfa")
             self._log(
-                f"{'مرحله ۳ شروع شد — تأیید واقعی تانل با SlipNet…' if fa else 'Phase 3 started — real tunnel verify via SlipNet…'}")
+                f"{'مرحله ۳ شروع شد - تأیید واقعی تانل با SlipNet…' if fa else 'Phase 3 started - real tunnel verify via SlipNet…'}")
             self._run_e2e_auto()
         else:
-            # No results or stopped — just enable save if anything found
+            # No results or stopped - just enable save if anything found
             self._W["btn_scan"].config(state="normal",  bg=ACCENT,  fg="#000000", disabledforeground=DIS_FG)
             if found:
                 mode = self._vpn_mode.get()
@@ -7184,11 +7717,11 @@ class App(tk.Tk):
                 else:
                     self._W["btn_vd_save"].config(state="normal", bg=PURPLE, fg=BTN_TEXT, disabledforeground=DIS_FG)
             self._W["status_lbl"].config(
-                text=f"● {'اتمام' if fa else 'Done'}  —  {found} {'یافت‌شده' if fa else 'found'}",
+                text=f"● {'اتمام' if fa else 'Done'}  -  {found} {'یافت‌شده' if fa else 'found'}",
                 fg=GREEN)
 
     def _run_e2e_auto(self):
-        """Auto Phase 3 — triggered automatically after Phase 2."""
+        """Auto Phase 3 - triggered automatically after Phase 2."""
         fa     = self._lang == "fa"
         domain = self._domain_var.get().strip()
 
@@ -7220,16 +7753,27 @@ class App(tk.Tk):
     def _start_doh_dot_scan(self):
         """Probe the curated DoH and DoT endpoint lists.
 
-        Unlike the UDP scan this doesn't require a tunnel domain — it's a
-        pure reachability + latency check from the user's network. Useful
-        for picking a `custom_resolver` value to paste into a VayDNS DoH
-        or DoT profile when plain UDP isn't surviving DPI any more.
+        Unlike the UDP scan this doesn't require a tunnel domain - it's a
+        pure reachability and latency check from the user's network. Results
+        feed straight into the VayDNS profile saver, which creates one
+        profile per transport found (one DoH profile and one DoT profile).
         """
         if not DNS_AVAILABLE:
             messagebox.showerror(
                 "Error", "dnspython not installed.\nRun:  pip install dnspython")
             return
         fa = self._lang == "fa"
+
+        # Defensive: DoH/DoT only works with VayDNS. The button is hidden
+        # under MasterDNS mode but a programmatic invocation (or a stale
+        # keybinding) could still get here. Auto-switch the user to VayDNS
+        # mode rather than failing silently.
+        if self._vpn_mode.get() != "vaydns":
+            self._set_vpn_mode("vaydns")
+            self._log(("حالت به VayDNS تغییر کرد - DoH/DoT فقط با VayDNS کار می‌کند"
+                       if fa else
+                       "Switched to VayDNS mode: DoH/DoT only works with VayDNS"))
+
         endpoints_doh = get_doh_endpoints()
         endpoints_dot = get_dot_endpoints()
         if not (endpoints_doh or endpoints_dot):
@@ -7277,7 +7821,7 @@ class App(tk.Tk):
                     else asyncio.new_event_loop())
             asyncio.set_event_loop(loop)
             try:
-                # Scan DoH first, then DoT — display interleaves naturally
+                # Scan DoH first, then DoT - display interleaves naturally
                 # because results stream as they arrive.
                 if endpoints_doh and not self._stop_ev.is_set():
                     loop.run_until_complete(
@@ -7415,7 +7959,7 @@ class App(tk.Tk):
             return
         try:
             with open(path, "w", encoding="utf-8") as f:
-                f.write("# KevinNet DNS — Scanned Resolvers\n")
+                f.write("# KevinNet DNS - Scanned Resolvers\n")
                 f.write(f"# {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
                 f.write(f"# Total: {len(self._found_ips)}\n\n")
                 f.write("\n".join(self._found_ips) + "\n")
@@ -7433,7 +7977,7 @@ class App(tk.Tk):
           1. UDP scan results (_found_ips populated): save one UDP profile
           2. DoH/DoT scan results (_doh_found / _dot_found populated): save
              one profile per transport found, suffixed `-DoH` / `-DoT`
-          3. Mixed (rare — UDP scan then DoH scan without clearing):
+          3. Mixed (rare - UDP scan then DoH scan without clearing):
              prefer DoH/DoT if both kinds present, since the UDP results
              would have already been saveable via the earlier auto-save.
         """
@@ -7451,7 +7995,7 @@ class App(tk.Tk):
                 "", "هیچ Resolver یافت نشد." if fa else "No resolvers found.")
             return
 
-        # Same validation as UDP path — Domain and Pubkey required
+        # Same validation as UDP path - Domain and Pubkey required
         ok, err = validate_domain(domain)
         if not ok:
             messagebox.showwarning(
@@ -7471,7 +8015,7 @@ class App(tk.Tk):
 
         ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # Branch 1: DoH/DoT — save one profile per transport found
+        # Branch 1: DoH/DoT - save one profile per transport found
         if have_doh_dot:
             saved_profiles = []  # list of (transport, script_path) for the summary dialog
             for transport, endpoints, suffix in [
@@ -7522,7 +8066,7 @@ class App(tk.Tk):
             messagebox.showinfo("Saved", "\n".join(summary_lines))
             return
 
-        # Branch 2: classic UDP scan — same behaviour as before
+        # Branch 2: classic UDP scan - same behaviour as before
         profile = {
             "name":           country,
             "date":           ts,
@@ -7536,7 +8080,7 @@ class App(tk.Tk):
         try:
             script = write_vaydns_launch_script(profile)
             save_new_vaydns_profile(profile)
-            self._log(f"{'✓ VayDNS پروفایل ذخیره شد — تب VayDNS Profiles را ببینید' if fa else '✓ VayDNS profile saved — see VayDNS Profiles tab'}")
+            self._log(f"{'✓ VayDNS پروفایل ذخیره شد - تب VayDNS Profiles را ببینید' if fa else '✓ VayDNS profile saved - see VayDNS Profiles tab'}")
             messagebox.showinfo(
                 "Saved",
                 f"{'VayDNS پروفایل ذخیره شد:' if fa else 'VayDNS profile saved to:'}"
@@ -7548,7 +8092,7 @@ class App(tk.Tk):
             messagebox.showerror("", str(e))
 
     def _save_configs_silent(self):
-        """Auto-save with defaults immediately after scan — no dialog.
+        """Auto-save with defaults immediately after scan - no dialog.
         Creates the profile and output files so Launch VPN works straight away."""
         if not self._found_ips:
             return
@@ -7575,7 +8119,7 @@ class App(tk.Tk):
             self._auto_saved_stem = save_new_profile(profile)
             self._saved_folder    = folder
             self._log(
-                f"{'✓ ذخیره خودکار با پیش‌فرض — برای تغییر MTU به تب پروفایل‌ها بروید' if fa else '✓ Auto-saved with defaults — go to MasterDNS Profiles tab to edit MTU and options'}")
+                f"{'✓ ذخیره خودکار با پیش‌فرض - برای تغییر MTU به تب پروفایل‌ها بروید' if fa else '✓ Auto-saved with defaults - go to MasterDNS Profiles tab to edit MTU and options'}")
         except Exception as e:
             self._log(f"{'خطا در ذخیره خودکار:' if fa else 'Auto-save error:'} {e}")
 
@@ -7607,7 +8151,7 @@ class App(tk.Tk):
             bin_path_q = shlex.quote(str(bin_path))
 
             if sys.platform == "win32":
-                # Windows Popen with cwd handles spaces natively — no quoting needed
+                # Windows Popen with cwd handles spaces natively - no quoting needed
                 subprocess.Popen(
                     ["cmd", "/c", "start", "", str(bin_path)],
                     cwd=str(folder)
@@ -7624,9 +8168,9 @@ class App(tk.Tk):
             else:
                 launched = False
                 for term, args in [
-                    # gnome-terminal / konsole / xfce4 pass cwd as argument — safe with spaces
+                    # gnome-terminal / konsole / xfce4 pass cwd as argument - safe with spaces
                     ("gnome-terminal", ["--working-directory", str(folder), "--", str(bin_path)]),
-                    # xterm uses -e with a shell string — must quote
+                    # xterm uses -e with a shell string - must quote
                     ("xterm",          ["-e", f"cd {folder_q} && {bin_path_q}"]),
                     ("konsole",        ["--workdir", str(folder), "-e", str(bin_path)]),
                     ("xfce4-terminal", ["--working-directory", str(folder), "-e", str(bin_path)]),
@@ -7683,7 +8227,7 @@ class App(tk.Tk):
             messagebox.showerror("", str(e))
             return
 
-        # Save or update profile JSON — update auto-saved one if it exists,
+        # Save or update profile JSON - update auto-saved one if it exists,
         # otherwise create new (prevents duplicate profiles per scan)
         try:
             if self._auto_saved_stem:

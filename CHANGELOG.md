@@ -1,166 +1,158 @@
 # Changelog
 
-All notable changes to **KevinNet DNS** will be documented in this file.
+All notable changes to **KevinNet DNS** are documented in this file.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-This changelog starts at **v3.3.0**. Earlier releases are not retroactively
-documented — see git history and GitHub releases for changes prior to this
-version.
+This changelog covers releases that ship on GitHub. The intermediate
+3.3.x development versions were internal iterations and are not published
+separately; all of their changes are rolled into 4.0.0 below.
 
 ---
 
-## [3.3.2] — 2026-05-22
+## [4.0.0] - 2026-05-22
+
+A major release covering everything between v3.2.2 and v4.0.0. This is a
+substantial visual refresh, a meaningful security and robustness pass,
+and a real expansion of what KevinNet can scan and save.
+
+### Highlights at a glance
+
+- New **light theme** with toggle, plus automatic detection of the OS
+  appearance setting
+- New **Scan DoH/DoT** button that probes encrypted DNS endpoints
+  (much harder for Iranian DPI to fingerprint than plain UDP/53)
+- DoH/DoT scan results save directly into VayDNS profiles
+- New **HTML help file** opens in your browser, themed to match the app
+- **87 unit tests** now run in CI before any release build
+- Profile rows no longer truncate long names or wrap metadata badly
+- All MasterDNS encryption keys and config files are now created with
+  restrictive permissions on Linux/macOS
+- Cleaned up two thousand lines of hardcoded data into editable text
+  files under `data/` (still bundled into the binary as fallback)
+- Em-dashes and decorative emoji removed throughout
 
 ### Added
 
-- **DoH/DoT results are now saveable as VayDNS profiles.** After running
-  the 🔒 Scan DoH/DoT button, the existing **💾 Save to VayDNS Profiles**
-  button becomes active. Clicking it creates one VayDNS profile per
-  transport found — for example, if 12 DoH and 8 DoT endpoints were
-  reachable, you get an `<Country>-DoH` profile and an `<Country>-DoT`
-  profile, each with all the working endpoints baked in and the
-  transport flag pre-set. The save flow uses the same Domain and Pubkey
-  fields as the regular VayDNS UDP scan — no extra dialogs.
-- Helpful "Click 💾 Save to VayDNS Profiles" hint logged after a
-  successful DoH/DoT scan, so the next step is discoverable.
-
-### Changed
-
-- **VayDNS launch script (`run.sh` / `run.bat`) now supports multi-endpoint
-  fallthrough for DoH and DoT, not only for UDP.** Previously the DoH/DoT
-  path only honoured the legacy `custom_resolver` option, ignoring any
-  endpoint list in the profile — which meant the new save-from-scan
-  flow would have written a profile that didn't actually launch
-  correctly. Now any 2+ endpoints get the same `RESOLVERS=( ... )` loop
-  with timeout-and-move-on behaviour that UDP profiles use.
-- Profiles loaded by older releases (which only had `custom_resolver`
-  and an empty `resolvers` list) continue to work unchanged.
-
-### Fixed
-
-- The "Save to VayDNS Profiles" button stayed disabled after a
-  successful DoH/DoT scan even though valid endpoints were available.
-
----
-
-## [3.3.1] — 2026-05-22
-
-### Fixed
-
-- **Scans found very few resolvers when running from source without a
-  `data/` folder next to `kevinnet.py`** — and the DoH/DoT button
-  reported "no endpoints configured" for the same reason. The 3.3.0
-  release introduced external `data/*.txt` files but only kept a
-  five-IP fallback for the embedded constants, which meant the app
-  degraded to a near-empty scan list when those files weren't found.
-- **DoH and DoT endpoint lists** had no embedded fallback at all, so
-  `get_doh_endpoints()` and `get_dot_endpoints()` returned an empty
-  list whenever the `data/` folder wasn't present.
-
-### Changed
-
-- **Embedded data lists are now the full lists, not stubs.** The app
-  ships with the complete resolver, CIDR, WhiteDNS, and DoH/DoT lists
-  baked into the Python source and works correctly out of the box
-  with no `data/` folder at all. External `data/*.txt` files still
-  take priority when present, so advanced users can still override
-  the bundled lists without rebuilding.
-
----
-
-## [3.3.0] — 2026-05-21
-
-### Added
-
-- **DoH / DoT scanning** — new `🔒  Scan DoH/DoT` button on the scanner
-  tab probes a curated list of well-known DNS-over-HTTPS (port 443) and
-  DNS-over-TLS (port 853) endpoints. Because the traffic is TLS, it's
-  much harder for Iranian DPI to fingerprint as tunnel traffic than
-  plain UDP/53. Found endpoints feed straight into VayDNS profiles.
-  Curated lists ship in `data/doh_endpoints.txt` and
-  `data/dot_endpoints.txt`; both files can be edited or replaced
-  without rebuilding the app.
+- **Scan DoH/DoT button** (visible only in VayDNS mode) tests 25 DoH
+  endpoints and 18 DoT endpoints. Working endpoints stream into the
+  results with a 🔒 marker and a latency number.
+- **Save DoH/DoT results as VayDNS profiles** - the existing Save to
+  VayDNS Profiles button is now transport-aware. If your scan finds
+  both DoH and DoT endpoints, you get two profiles (e.g. `Iran-DoH`
+  and `Iran-DoT`), each with all the working endpoints baked in.
+- **Multi-endpoint launch script** for DoH and DoT - previously only
+  UDP profiles could fall through multiple resolvers; now any transport
+  can. If the first endpoint stalls or fails, the script kills it and
+  tries the next one automatically.
+- **Light theme** with a one-click toggle in the top bar (sun/moon
+  glyph). Persisted across launches. New users get whatever their OS
+  is set to (Windows AppsUseLightTheme registry key, macOS
+  AppleInterfaceStyle, Linux gsettings color-scheme).
+- **HTML help file** generated next to the binary on first click of
+  the Help button. Themed to match the active palette, mobile-friendly,
+  works offline, easy to copy/paste server-setup commands from.
 - **Right-click context menu** on the resolver tree: Copy IP, Copy all
   IPs, Open output folder. Works on Linux/Windows (right-click), macOS
   multi-button mice and trackpads (two-finger), and macOS single-button
   Magic Mouse (Ctrl-click).
-- **"Last launched" indicator** on each profile in the MasterDNS and
-  VayDNS profile lists (`launched 5m ago`, `launched 3h ago`, etc.). Makes
-  it obvious which profile is currently active when you have many.
-- **"Don't show again" checkbox** on the help dialog when it auto-opens
-  at startup. The checkbox is hidden when help is opened explicitly
-  from the header button.
-- **Persisted UI state** — the app remembers your last domain, country
-  folder, and VPN mode across restarts (stored in
-  `kevinnet_settings.json` next to the executable).
-- **Input validators** for tunnel domains, encryption keys, public keys,
-  and folder names. Bad input is now rejected at the start of the scan
-  with a clear, translated error message instead of producing confusing
-  `parse TOML failed` errors later.
-- **Unit test suite** (`tests/`) with 87 tests covering validators,
-  scanner helpers, profile config building, and the settings module.
-  Runs in CI before any release build — no broken refactor ships.
-- **SHA-256 manifest** (`SHA256SUMS.txt`) attached to every GitHub
-  release alongside the binaries. Users can verify downloads haven't
-  been tampered with on mirror sites.
+- **Last-launched indicator** on each profile (`launched 5m ago`,
+  `launched 3h ago`). Makes the active profile obvious in a long list.
+- **Persisted UI state** across restarts: last domain, country folder,
+  and VPN mode (stored in `kevinnet_settings.json` next to the binary).
+- **"Don't show again" checkbox** on the startup help dialog. Hidden
+  when help is opened explicitly from the header button.
+- **Input validators** for tunnel domain, encryption key, public key,
+  and folder name. Bad input is rejected at scan-start with a clear
+  translated error message instead of producing confusing `parse TOML
+  failed` errors later.
+- **87 unit tests** covering validators, scanner helpers, profile
+  config building, and the settings module. Runs in CI before every
+  release build via a new `test` job that gates the platform builds.
+- **SHA-256 manifest** (`SHA256SUMS.txt`) attached to every release
+  alongside the binaries. Users can verify downloads haven't been
+  tampered with on mirror sites.
+- **Mode-context hint** under the VPN mode pills explaining what
+  the current mode will scan, so the workflow is obvious instead
+  of inferred.
 
 ### Changed
 
-- **Project structure** — the three large hardcoded data blocks (Iranian
-  CIDR ranges, public resolvers, WhiteDNS Iran list, ~2,400 lines total)
-  moved from `kevinnet.py` into separate text files under `data/`. The
-  main file shrunk from ~6,800 to ~4,900 lines and the data lists are
-  now editable without rebuilding. Minimal fallback constants stay
-  embedded so the app still starts if `data/` is missing.
-- **Profile file permissions** — profile JSONs and `client_config.toml`
-  files are now created with `0600` permissions on Linux/macOS so other
-  users on the same machine can't read your MasterDNS encryption key.
-- **Profile filenames** now include a 4-character random suffix in
+- **Scanner panel reshapes based on VPN mode.** The Scan DoH/DoT
+  button only appears under VayDNS mode (MasterDNS doesn't support
+  encrypted transports). MasterDNS-only and VayDNS-only fields hide
+  themselves when the other mode is selected.
+- **Profile row sizing** - long profile names now wrap to a second
+  line instead of being clipped on the right edge. Metadata
+  (`date . N resolvers . transport . launched X ago`) wraps cleanly
+  when long. Row padding increased for better readability.
+- **Profile filenames** include a 4-character random suffix in
   addition to the timestamp, preventing collisions when two profiles
   are saved within the same second.
-- **TOML values are properly escaped** when building `client_config.toml`.
-  An accidentally-pasted `"` or `\` in the domain or key field no longer
-  breaks the generated config.
-- **Shell command building** for VayDNS launch scripts now uses
-  `shlex.quote()` on the pubkey and domain values (Unix). Defence in
-  depth — the validators reject bad input upstream, but quoting
-  guarantees the shell can never misinterpret the command.
-- **Iran CIDR sampling** (`get_iran_sample`) now correctly avoids
-  network and broadcast addresses on every range, and gracefully
-  returns an empty list if no CIDR ranges are loaded.
+- **TOML string escaping** when building `client_config.toml`. A stray
+  `"` or `\` in the domain or key field no longer breaks the generated
+  config.
+- **shlex.quote() defence in depth** on pubkey and domain values
+  when building the VayDNS launch command (Unix).
+- **Iran CIDR sampling** now correctly avoids network and broadcast
+  addresses on every range, and gracefully returns an empty list if
+  no ranges are loaded.
 - **SlipNet output parser** uses a strict per-octet IPv4 regex plus
-  `ipaddress.IPv4Address` validation — invalid IPs in tool output are
-  silently dropped instead of being treated as resolvers.
+  `ipaddress.IPv4Address` validation - invalid IPs in tool output
+  are silently dropped instead of being treated as resolvers.
+- **Data files extracted from source.** Around 2,400 lines of hardcoded
+  data (Iranian CIDRs, public resolvers, WhiteDNS list, DoH/DoT
+  endpoint lists) moved into `data/*.txt` files. The full lists are
+  also embedded in the source as fallbacks, so the app works on its
+  own with no `data/` folder; external files take priority when
+  present so advanced users can override the bundled lists.
+- **Em-dashes removed throughout.** Replaced with colons or hyphens
+  depending on context, in code comments, log messages, and docs.
+- **Decorative emoji removed.** Functional emoji that communicate
+  status or action stay. Decorative ones are gone.
 
 ### Fixed
 
+- **Profile JSONs and client_config.toml are created with 0600
+  permissions** on Linux/macOS so other users on the same machine
+  can't read your MasterDNS shared encryption key.
 - A bare `except:` block in the VPN-mode switcher now catches only
   `Exception` so `KeyboardInterrupt` and `SystemExit` still propagate.
 - `_safe_profile_stem` no longer produces filenames starting with `_`
-  when the user enters only special characters or emoji — falls back to
-  the default stem name.
+  when the user enters only special characters or emoji. Falls back
+  to a default stem.
+- DoH/DoT button now hides correctly under MasterDNS mode at startup
+  (previously stayed visible on first launch even though the mode
+  didn't support it).
+- The Save to VayDNS Profiles button now correctly enables after a
+  successful DoH/DoT scan.
 
 ### Security
 
 - MasterDNS encryption keys are still stored in plaintext in profile
-  JSONs — the `0600` permissions reduce the local-machine exposure,
-  but moving to OS-native keystores (Windows DPAPI, macOS Keychain,
-  Linux Secret Service) is planned for a future release.
+  JSONs (now protected by file permissions on Unix). Moving to
+  OS-native keystores (Windows DPAPI, macOS Keychain, Linux Secret
+  Service) is planned for a future release.
 
-### Notes for Distributors
+### Notes for distributors
 
 - The `data/` folder must be bundled with PyInstaller. All bundled
-  build scripts (`build_linux.sh`, `build_mac_universal.sh`,
-  `build_windows.bat`) and CI workflows already handle this.
-- The test job runs on every push/tag and must pass before binaries
-  are built. `pip install pytest dnspython` + `pytest tests/` to run
-  the suite locally.
+  build scripts and CI workflows already handle this.
+- The test job runs on every push and tag and must pass before
+  binaries are built. `pip install pytest dnspython` then
+  `pytest tests/` to run the suite locally.
+
+---
+
+## [3.2.2] - 2026-04-XX
+
+Last release before the 4.0.0 cleanup pass. See the GitHub release
+notes for details.
 
 ---
 
 <!--
-Add new releases at the top. Sections (in this order, omit any that
-don't apply):  Added · Changed · Deprecated · Removed · Fixed · Security
+Add new releases at the top. Sections in this order, omit any that
+don't apply:  Added . Changed . Deprecated . Removed . Fixed . Security
 -->

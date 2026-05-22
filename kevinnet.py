@@ -4035,43 +4035,66 @@ if _needs_bidi_fix:
 # WCAG AA contrast for body text in both modes.
 
 _THEME_DARK = {
-    "BG":      "#14181F",   # window background
-    "PANEL":   "#0F131A",   # top bar / footer (slightly darker than BG)
-    "CARD":    "#1E2530",   # cards / panels (one step lighter than BG)
-    "BORDER":  "#303B4A",   # 1px hairlines
-    "ACCENT":  "#14B8A6",   # teal - primary action (Start Scan)
-    "BLUE":    "#3B82F6",   # blue - secondary action (Save MasterDNS)
-    "GREEN":   "#84CC16",   # lime - success
-    "WARN":    "#FB923C",   # orange - scanning / in-progress
-    "DANGER":  "#F43F5E",   # rose - stop / destructive
-    "PURPLE":  "#C084FC",   # lavender - VayDNS-specific actions
-    "TEXT":    "#ECECEC",   # primary text
-    "MUTED":   "#8E9DB0",   # secondary text (metadata, labels)
-    "INPUT":   "#0B0E14",   # input field background (darker than BG)
-    "HINT":    "#5C6675",   # placeholder text in inputs
-    "BTN_TEXT":"#0B0E14",   # text on colored buttons (dark on accent)
-    "DIS_BG":  "#252D3A",   # disabled button background
-    "DIS_FG":  "#4A5566",   # disabled button text
+    # Surfaces
+    "BG":           "#0E1419",   # window background
+    "BG_ELEVATED":  "#131A21",   # top bar / tab bar (one step up)
+    "CARD":         "#1A2128",   # card surfaces (stand out from bg)
+    "CARD_HOVER":   "#1F2730",   # hover state on cards/rows
+    "BORDER":       "#232B35",   # subtle hairlines
+    "BORDER_BOLD":  "#2D3744",   # card edges, more visible
+    "INPUT":        "#0B1015",   # input field bg (darker than bg)
+
+    # Text
+    "TEXT":         "#E8ECF1",   # body text
+    "TEXT_STRONG":  "#FFFFFF",   # headings
+    "MUTED":        "#8B95A1",   # secondary text
+    "HINT":         "#5A6470",   # placeholders
+
+    # Brand / status
+    "ACCENT":       "#14B8A6",   # teal — primary
+    "ACCENT_HOVER": "#0F9E8E",
+    "ACCENT_SOFT":  "#0F2A28",   # tinted bg for accent surfaces
+    "BLUE":         "#3B82F6",   # MasterDNS color
+    "PURPLE":       "#A78BFA",   # VayDNS color
+    "GREEN":        "#84CC16",   # success
+    "WARN":         "#FB923C",   # scanning / in-progress
+    "DANGER":       "#F43F5E",   # stop / destructive
+
+    # Buttons
+    "BTN_TEXT":     "#0B1015",   # text on accent buttons (dark on light bg)
+
+    # Disabled
+    "DIS_BG":       "#1A2128",
+    "DIS_FG":       "#3D4753",
 }
 
 _THEME_LIGHT = {
-    "BG":      "#FAFAF7",   # warm off-white
-    "PANEL":   "#F2F2EE",   # top bar / footer (one step darker than BG)
-    "CARD":    "#FFFFFF",   # cards stand out as pure white
-    "BORDER":  "#E5E2DB",   # warm hairline
-    "ACCENT":  "#0D9488",   # darker teal for AA contrast on white
-    "BLUE":    "#2563EB",   # darker blue for AA contrast
-    "GREEN":   "#65A30D",   # darker lime
-    "WARN":    "#EA580C",   # darker orange
-    "DANGER":  "#E11D48",   # darker rose
-    "PURPLE":  "#9333EA",   # darker purple for AA contrast on white
-    "TEXT":    "#1F242E",   # near-black with warmth
-    "MUTED":   "#5C6675",   # readable secondary text (4.5:1 on white)
-    "INPUT":   "#FFFFFF",   # input field background
-    "HINT":    "#9CA3AF",   # placeholder text
-    "BTN_TEXT":"#FFFFFF",   # text on colored buttons (white on accent)
-    "DIS_BG":  "#E5E2DB",   # disabled background
-    "DIS_FG":  "#A8A29E",   # disabled text
+    "BG":           "#FAFAF5",
+    "BG_ELEVATED":  "#F3F2EC",
+    "CARD":         "#FFFFFF",
+    "CARD_HOVER":   "#F7F6F0",
+    "BORDER":       "#E8E6DE",
+    "BORDER_BOLD":  "#D4D2C8",
+    "INPUT":        "#F7F6F0",
+
+    "TEXT":         "#1F242E",
+    "TEXT_STRONG":  "#0B0E14",
+    "MUTED":        "#5C6675",
+    "HINT":         "#9AA1AD",
+
+    "ACCENT":       "#0D9488",
+    "ACCENT_HOVER": "#0B7A70",
+    "ACCENT_SOFT":  "#E0F2F0",
+    "BLUE":         "#2563EB",
+    "PURPLE":       "#9333EA",
+    "GREEN":        "#65A30D",
+    "WARN":         "#EA580C",
+    "DANGER":       "#E11D48",
+
+    "BTN_TEXT":     "#FFFFFF",   # white text on the darker accent
+
+    "DIS_BG":       "#F3F2EC",
+    "DIS_FG":       "#9AA1AD",
 }
 
 # Tone helpers - used to build subtle variations of the active palette
@@ -4097,11 +4120,14 @@ def _mix(a: str, b: str, t: float) -> str:
 # These are populated by `_load_theme()` below. They're plain module
 # globals so existing code (`bg=BG`, `fg=TEXT`, etc.) keeps working.
 
-BG = PANEL = CARD = BORDER = ""
-ACCENT = BLUE = GREEN = WARN = DANGER = PURPLE = ""
-TEXT = MUTED = INPUT = HINT = ""
+BG = BG_ELEVATED = CARD = CARD_HOVER = BORDER = BORDER_BOLD = INPUT = ""
+ACCENT = ACCENT_HOVER = ACCENT_SOFT = BLUE = PURPLE = GREEN = WARN = DANGER = ""
+TEXT = TEXT_STRONG = MUTED = HINT = ""
 BTN_TEXT = SCAN_FG = STOP_FG = SAVE_FG = CLEAR_FG = BTN_FG = ""
 DIS_BG = DIS_FG = ""
+# Backwards-compat alias: code at several places still uses PANEL,
+# which the new palette names BG_ELEVATED.
+PANEL = ""
 
 # Tracks current theme name: "dark" or "light"
 _CURRENT_THEME = "dark"
@@ -4155,31 +4181,40 @@ def detect_system_theme() -> str:
 def _load_theme(name: str) -> None:
     """Populate the module-level color globals from a named palette.
 
-    Called at startup and on every theme switch. Does NOT touch any
-    Tk widgets - that's the job of `apply_theme()`."""
-    global BG, PANEL, CARD, BORDER, ACCENT, BLUE, GREEN, WARN, DANGER, PURPLE
-    global TEXT, MUTED, INPUT, HINT, BTN_TEXT, SCAN_FG, STOP_FG, SAVE_FG
-    global CLEAR_FG, BTN_FG, DIS_BG, DIS_FG, _CURRENT_THEME
+    Called at startup. Does NOT touch any Tk widgets - it only swaps
+    the module constants. Live re-coloring of existing widgets is
+    handled separately (with caveats - see _toggle_theme docstring)."""
+    global BG, BG_ELEVATED, PANEL, CARD, CARD_HOVER, BORDER, BORDER_BOLD, INPUT
+    global ACCENT, ACCENT_HOVER, ACCENT_SOFT, BLUE, PURPLE, GREEN, WARN, DANGER
+    global TEXT, TEXT_STRONG, MUTED, HINT
+    global BTN_TEXT, SCAN_FG, STOP_FG, SAVE_FG, CLEAR_FG, BTN_FG
+    global DIS_BG, DIS_FG, _CURRENT_THEME
 
     palette = _THEME_LIGHT if name == "light" else _THEME_DARK
-    BG       = palette["BG"]
-    PANEL    = palette["PANEL"]
-    CARD     = palette["CARD"]
-    BORDER   = palette["BORDER"]
-    ACCENT   = palette["ACCENT"]
-    BLUE     = palette["BLUE"]
-    GREEN    = palette["GREEN"]
-    WARN     = palette["WARN"]
-    DANGER   = palette["DANGER"]
-    PURPLE   = palette["PURPLE"]
-    TEXT     = palette["TEXT"]
-    MUTED    = palette["MUTED"]
-    INPUT    = palette["INPUT"]
-    HINT     = palette["HINT"]
-    BTN_TEXT = palette["BTN_TEXT"]
-    DIS_BG   = palette["DIS_BG"]
-    DIS_FG   = palette["DIS_FG"]
-    # Legacy aliases - several call-sites use these names
+    BG           = palette["BG"]
+    BG_ELEVATED  = palette["BG_ELEVATED"]
+    PANEL        = palette["BG_ELEVATED"]   # legacy alias
+    CARD         = palette["CARD"]
+    CARD_HOVER   = palette["CARD_HOVER"]
+    BORDER       = palette["BORDER"]
+    BORDER_BOLD  = palette["BORDER_BOLD"]
+    INPUT        = palette["INPUT"]
+    ACCENT       = palette["ACCENT"]
+    ACCENT_HOVER = palette["ACCENT_HOVER"]
+    ACCENT_SOFT  = palette["ACCENT_SOFT"]
+    BLUE         = palette["BLUE"]
+    PURPLE       = palette["PURPLE"]
+    GREEN        = palette["GREEN"]
+    WARN         = palette["WARN"]
+    DANGER       = palette["DANGER"]
+    TEXT         = palette["TEXT"]
+    TEXT_STRONG  = palette["TEXT_STRONG"]
+    MUTED        = palette["MUTED"]
+    HINT         = palette["HINT"]
+    BTN_TEXT     = palette["BTN_TEXT"]
+    DIS_BG       = palette["DIS_BG"]
+    DIS_FG       = palette["DIS_FG"]
+    # Legacy aliases used in several call-sites
     SCAN_FG = STOP_FG = SAVE_FG = CLEAR_FG = BTN_FG = BTN_TEXT
     _CURRENT_THEME = name
 
@@ -4209,31 +4244,6 @@ def _initial_theme() -> str:
 
 _load_theme(_initial_theme())
 
-
-def _remap_color(c: str) -> str | None:
-    """Given a color that may belong to either palette, return the
-    equivalent color in the currently-active palette.
-
-    Returns None if the input doesn't match any role color (in which
-    case the caller leaves the widget alone). Used by the live theme
-    switch to translate widget colors set under the old palette.
-    """
-    if not c or not c.startswith("#"):
-        return None
-    c = c.lower()
-    # Build a role lookup once: for every role, what are the possible
-    # color values across both palettes?
-    other = _THEME_LIGHT if _CURRENT_THEME == "dark" else _THEME_DARK
-    active = _THEME_LIGHT if _CURRENT_THEME == "light" else _THEME_DARK
-    # Reverse map: hex (lowercased) → role name
-    for role, val in other.items():
-        if val.lower() == c:
-            return active[role]
-    # Already in the active palette - no change needed
-    for role, val in active.items():
-        if val.lower() == c:
-            return val
-    return None
 
 # Legacy aliases kept for compatibility
 CONN_BG  = PURPLE
@@ -4735,7 +4745,7 @@ def show_help(parent, lang, *, allow_dismiss: bool = False):
 
     tk.Button(btn_row,
               text=_bidi("✓  متوجه شدم") if lang == "fa" else "Got it  ✓",
-              bg=ACCENT, fg="#000000", font=ff(11, "bold"),
+              bg=ACCENT, fg=BTN_TEXT, font=ff(11, "bold"),
               relief="flat", bd=0, pady=11, padx=30, cursor="hand2",
               activebackground="#00bfa5", activeforeground="#000000",
               command=_close).pack(side="right", padx=24)
@@ -5562,11 +5572,11 @@ class App(tk.Tk):
                     _, verified = item
                     fa = self._lang == "fa"
                     self._found_ips = list(verified)
-                    self._W["btn_scan"].config(state="normal",  bg=ACCENT,  fg="#000000", disabledforeground=DIS_FG)
+                    self._W["btn_scan"].config(state="normal",  bg=ACCENT,  fg=BTN_TEXT, disabledforeground=DIS_FG)
                     if verified:
                         mode = self._vpn_mode.get()
                         if mode == "masterdns":
-                            self._W["btn_save"].config(state="normal", bg=BLUE, fg="#000000", disabledforeground=DIS_FG)
+                            self._W["btn_save"].config(state="normal", bg=BLUE, fg=BTN_TEXT, disabledforeground=DIS_FG)
                         else:
                             self._W["btn_vd_save"].config(state="normal", bg=PURPLE, fg=BTN_TEXT, disabledforeground=DIS_FG)
                     if self._found_ips:
@@ -5606,7 +5616,7 @@ class App(tk.Tk):
                     fa = self._lang == "fa"
                     self._scanning = False
                     self._W["btn_scan"].config(
-                        state="normal", bg=ACCENT, fg="#000000",
+                        state="normal", bg=ACCENT, fg=BTN_TEXT,
                         disabledforeground=DIS_FG)
                     self._W["btn_doh_scan"].config(
                         state="normal", bg=PURPLE, fg=BTN_TEXT,
@@ -5644,68 +5654,156 @@ class App(tk.Tk):
     def _build_ui(self):
         W = self._W
 
-        topbar = tk.Frame(self, bg=PANEL, height=60)
+        # Main window background needs explicit set (some themes don't
+        # honor BG via the default __init__ configure).
+        self.configure(bg=BG)
+
+        # Top bar: brand mark + wordmark on the left, action icons right.
+        # Height tightened from 60 to 56 to match modern app conventions.
+        topbar = tk.Frame(self, bg=BG_ELEVATED, height=56)
         topbar.pack(fill="x")
         topbar.pack_propagate(False)
 
-        tk.Label(topbar, text="KevinNet DNS", bg=PANEL, fg=ACCENT,
-                 font=F(18, "bold")).pack(side="left", padx=(20, 8))
-        tk.Label(topbar, text="·  DNS Resolver Scanner", bg=PANEL, fg=MUTED,
-                 font=F(11)).pack(side="left")
-        tk.Label(topbar, text="by Kevin Haji", bg=PANEL, fg=HINT,
-                 font=F(10)).pack(side="left", padx=(10,0))
+        # Brand block — a small accented "K" square next to the wordmark.
+        # Tkinter can't do real CSS gradients on a label, so we use a flat
+        # accent color and add a 1px highlight border on the bottom-right
+        # for a hint of dimension.
+        brand = tk.Frame(topbar, bg=BG_ELEVATED)
+        brand.pack(side="left", padx=(20, 0), pady=10)
 
-        btn_fr = tk.Frame(topbar, bg=PANEL)
+        mark = tk.Label(brand, text="K",
+                        bg=ACCENT, fg=BTN_TEXT,
+                        font=F(14, "bold"),
+                        width=2, height=1)
+        mark.pack(side="left", padx=(0, 12), ipady=2)
+
+        wordmark = tk.Label(brand, text="KevinNet DNS",
+                            bg=BG_ELEVATED, fg=TEXT_STRONG,
+                            font=F(15, "bold"))
+        wordmark.pack(side="left")
+
+        # Vertical divider between wordmark and tagline
+        divider = tk.Frame(brand, bg=BORDER, width=1, height=18)
+        divider.pack(side="left", padx=12, pady=(4, 4))
+
+        tagline = tk.Label(brand, text="DNS Resolver Scanner",
+                           bg=BG_ELEVATED, fg=MUTED,
+                           font=F(11))
+        tagline.pack(side="left")
+
+        # Right side: action buttons.
+        btn_fr = tk.Frame(topbar, bg=BG_ELEVATED)
         btn_fr.pack(side="right", padx=16)
 
-        def top_btn(parent, wkey, text, fg_c, command):
-            """Label-based button - reliable on macOS and Windows alike."""
-            fr = tk.Frame(parent, bg=BORDER,
-                          highlightbackground=BORDER, highlightthickness=1)
+        def icon_btn(parent, wkey, text, command, tooltip=""):
+            """Square icon button - matches the mockup's `.icon-btn` style.
+
+            32x32 with subtle border, hover state lifts the bg to
+            CARD_HOVER. Used for the help and theme toggles."""
+            fr = tk.Frame(parent, bg=BG_ELEVATED,
+                          highlightbackground=BORDER, highlightthickness=1,
+                          width=34, height=34)
             fr.pack(side="right", padx=(6, 0))
-            lbl = tk.Label(fr, text=text, bg=BORDER, fg=fg_c,
-                           font=FA(10, "bold"), padx=14, pady=7,
-                           cursor="hand2")
-            lbl.pack()
-            def on_enter(e):  lbl.config(bg=ACCENT, fg="#000000"); fr.config(bg=ACCENT)
-            def on_leave(e):  lbl.config(bg=BORDER, fg=fg_c);    fr.config(bg=BORDER)
-            def on_click(e):  command()
-            lbl.bind("<Enter>",   on_enter)
-            lbl.bind("<Leave>",   on_leave)
-            lbl.bind("<Button-1>",on_click)
+            fr.pack_propagate(False)
+            lbl = tk.Label(fr, text=text, bg=BG_ELEVATED, fg=MUTED,
+                           font=F(12, "bold"), cursor="hand2")
+            lbl.place(relx=0.5, rely=0.5, anchor="center")
+            def on_enter(e):
+                lbl.config(bg=CARD_HOVER, fg=TEXT)
+                fr.config(bg=CARD_HOVER, highlightbackground=BORDER_BOLD)
+            def on_leave(e):
+                lbl.config(bg=BG_ELEVATED, fg=MUTED)
+                fr.config(bg=BG_ELEVATED, highlightbackground=BORDER)
+            for w in (lbl, fr):
+                w.bind("<Enter>", on_enter)
+                w.bind("<Leave>", on_leave)
+                w.bind("<Button-1>", lambda e: command())
             W[wkey] = lbl
+            return lbl
 
-        top_btn(btn_fr, "btn_help", "؟  راهنما",
-                TEXT, lambda: open_help_html(self._lang))
-        # Theme toggle: shows sun glyph when in dark mode (click to go light),
-        # moon glyph when in light mode (click to go dark). Persists choice
-        # in kevinnet_settings.json so next launch matches.
-        top_btn(btn_fr, "btn_theme",
-                "☀" if current_theme() == "dark" else "☾",
-                TEXT, self._toggle_theme)
-        top_btn(btn_fr, "btn_lang", "English",
-                ACCENT, self._toggle_lang)
+        def text_btn(parent, wkey, text, command, fg_c=None):
+            """Pill-shaped text button (lang toggle). Accent on hover.
 
+            We don't call pack_propagate(False) here because the lang
+            button's width depends on its text (English/فارسی swap).
+            Setting a fixed width clips long Persian text; letting it
+            auto-size works in both languages."""
+            fg_c = fg_c or ACCENT
+            fr = tk.Frame(parent, bg=BG_ELEVATED,
+                          highlightbackground=BORDER, highlightthickness=1)
+            fr.pack(side="right", padx=(6, 0), pady=11)
+            lbl = tk.Label(fr, text=text, bg=BG_ELEVATED, fg=fg_c,
+                           font=F(11, "bold"), cursor="hand2",
+                           padx=14, pady=6)
+            lbl.pack(fill="both", expand=True)
+            def on_enter(e):
+                lbl.config(bg=ACCENT_SOFT)
+                fr.config(bg=ACCENT_SOFT, highlightbackground=ACCENT)
+            def on_leave(e):
+                lbl.config(bg=BG_ELEVATED)
+                fr.config(bg=BG_ELEVATED, highlightbackground=BORDER)
+            for w in (lbl, fr):
+                w.bind("<Enter>", on_enter)
+                w.bind("<Leave>", on_leave)
+                w.bind("<Button-1>", lambda e: command())
+            W[wkey] = lbl
+            return lbl
+
+        # Order matters - pack(side="right") inserts right-to-left, so
+        # the FIRST call here ends up at the FAR right of the bar.
+        text_btn(btn_fr, "btn_lang", "English", self._toggle_lang, fg_c=ACCENT)
+        icon_btn(btn_fr, "btn_theme",
+                 "☀" if current_theme() == "dark" else "☾",
+                 self._toggle_theme)
+        icon_btn(btn_fr, "btn_help", "?", lambda: open_help_html(self._lang))
+
+        # Hairline divider between topbar and tabbar
         tk.Frame(self, bg=BORDER, height=1).pack(fill="x")
 
         # ── TAB BAR ──────────────────────────────────────────────
-        tab_bar = tk.Frame(self, bg=PANEL, height=44)
+        # Underlined-tab pattern: muted text by default, accent text +
+        # 2px underline accent when active. Cleaner than the previous
+        # flat colored-pill approach.
+        tab_bar = tk.Frame(self, bg=BG_ELEVATED, height=48)
         tab_bar.pack(fill="x")
         tab_bar.pack_propagate(False)
 
-        def make_tab(wkey, en_text, fa_text, cmd):
-            lbl = tk.Label(tab_bar,
-                           text=fa_text if self._lang == "fa" else en_text,
-                           bg=PANEL, fg=MUTED,
-                           font=F(13, "bold"),
-                           padx=26, pady=12, cursor="hand2")
-            lbl.pack(side="left")
-            lbl.bind("<Button-1>", lambda e: cmd())
-            W[wkey] = lbl
+        # Track tab widgets and their underline frames so _show_*
+        # can paint the active one.
+        self._tab_widgets = {}
+        self._tab_underlines = {}
 
-        make_tab("tab_scanner",  "🔍  Scanner",      "🔍  اسکنر",      self._show_scanner)
-        make_tab("tab_profiles",    "📋  MasterDNS Profiles", "📋  MasterDNS",  self._show_profiles)
-        make_tab("tab_vd_profiles", "📋  VayDNS Profiles",    "📋  VayDNS",      self._show_vd_profiles)
+        def make_tab(wkey, en_text, fa_text, cmd):
+            text = fa_text if self._lang == "fa" else en_text
+            # Wrap each tab in a Frame so we can put a 2px underline at
+            # the bottom (positioned absolutely so it doesn't shift the
+            # label when toggling active state).
+            wrap = tk.Frame(tab_bar, bg=BG_ELEVATED)
+            wrap.pack(side="left", padx=4, pady=0)
+            lbl = tk.Label(wrap, text=text,
+                           bg=BG_ELEVATED, fg=MUTED,
+                           font=F(12, "bold"),
+                           padx=18, pady=14, cursor="hand2")
+            lbl.pack(side="top")
+            underline = tk.Frame(wrap, bg=BG_ELEVATED, height=2)
+            underline.pack(side="top", fill="x", padx=8)
+            lbl.bind("<Button-1>", lambda e: cmd())
+            # Hover effect: subtle text brightening
+            def on_enter(e):
+                if not self._is_active_tab(wkey):
+                    lbl.config(fg=TEXT)
+            def on_leave(e):
+                if not self._is_active_tab(wkey):
+                    lbl.config(fg=MUTED)
+            lbl.bind("<Enter>", on_enter)
+            lbl.bind("<Leave>", on_leave)
+            W[wkey] = lbl
+            self._tab_widgets[wkey] = lbl
+            self._tab_underlines[wkey] = underline
+
+        make_tab("tab_scanner",     "Scanner",            "اسکنر",   self._show_scanner)
+        make_tab("tab_profiles",    "MasterDNS Profiles", "MasterDNS Profiles", self._show_profiles)
+        make_tab("tab_vd_profiles", "VayDNS Profiles",    "VayDNS Profiles",    self._show_vd_profiles)
 
         tk.Frame(self, bg=BORDER, height=1).pack(fill="x")
 
@@ -5714,16 +5812,16 @@ class App(tk.Tk):
         self._profiles_view   = tk.Frame(self, bg=BG)
         self._vd_profiles_view = tk.Frame(self, bg=BG)
 
-        # ── Scanner view (original layout) ───────────────────────
+        # ── Scanner view ─────────────────────────────────────────
         body = self._scanner_view
 
         # Scrollable left panel - buttons always accessible even on small screens
-        left_outer = tk.Frame(body, bg=BG, width=420)
-        left_outer.pack(side="left", fill="y", padx=(12, 6), pady=10)
+        left_outer = tk.Frame(body, bg=BG, width=360)
+        left_outer.pack(side="left", fill="y", padx=(16, 8), pady=16)
         left_outer.pack_propagate(False)
 
         left_canvas = tk.Canvas(left_outer, bg=BG, bd=0,
-                                highlightthickness=0, width=400)
+                                highlightthickness=0, width=340)
         left_scroll = ttk.Scrollbar(left_outer, orient="vertical",
                                     command=left_canvas.yview)
         left_scroll.pack(side="right", fill="y")
@@ -5731,7 +5829,7 @@ class App(tk.Tk):
 
         left = tk.Frame(left_canvas, bg=BG)
         left_win = left_canvas.create_window((0, 0), window=left,
-                                              anchor="nw", width=395)
+                                              anchor="nw", width=340)
 
         def _on_left_configure(e):
             left_canvas.configure(scrollregion=left_canvas.bbox("all"))
@@ -5783,46 +5881,58 @@ class App(tk.Tk):
         # Start on Scanner tab
         self._show_scanner()
 
-        # ── FOOTER - credit in ONE place only ──
-        tk.Frame(self, bg=BORDER, height=1).pack(fill="x")
-        footer = tk.Frame(self, bg=PANEL, height=36)
-        footer.pack(fill="x")
+        # Footer: credit line. Status indicator is on the scanner's
+        # status bar, not here - this widget gets its own key to avoid
+        # overriding the scanner status_lbl reference.
+        tk.Frame(self, bg=BORDER, height=1).pack(fill="x", side="bottom")
+        footer = tk.Frame(self, bg=BG_ELEVATED, height=32)
+        footer.pack(fill="x", side="bottom")
         footer.pack_propagate(False)
         tk.Label(
             footer,
-            text="Designed & developed by  Kevin Haji  ·  kevinhaji.com"
-                 "  ·  kevin.fullstack.dev@gmail.com",
-            bg=PANEL, fg=MUTED, font=F(9)).pack(side="left", padx=16)
-        W["status_lbl"] = tk.Label(
-            footer, text="● Ready", bg=PANEL, fg=GREEN, font=F(9))
-        W["status_lbl"].pack(side="right", padx=16)
+            text=f"v{__version__}  ·  by Kevin Haji  ·  kevinhaji.com",
+            bg=BG_ELEVATED, fg=HINT, font=F(9)).pack(side="left", padx=16, pady=8)
 
 
     # ── TAB SWITCHING ────────────────────────────────────────────
+    def _is_active_tab(self, wkey: str) -> bool:
+        """True if `wkey` is the currently-selected tab.
+
+        Used by tab hover handlers so hover doesn't override the active
+        state."""
+        return getattr(self, "_active_tab", None) == wkey
+
+    def _set_active_tab(self, wkey: str):
+        """Visually mark `wkey` as the active tab (accent text + underline).
+
+        The other tabs go back to muted text with a transparent underline."""
+        self._active_tab = wkey
+        for k, lbl in self._tab_widgets.items():
+            if k == wkey:
+                lbl.config(fg=ACCENT)
+                self._tab_underlines[k].config(bg=ACCENT)
+            else:
+                lbl.config(fg=MUTED)
+                self._tab_underlines[k].config(bg=BG_ELEVATED)
+
     def _show_scanner(self):
         self._profiles_view.pack_forget()
         self._vd_profiles_view.pack_forget()
         self._scanner_view.pack(fill="both", expand=True)
-        self._W["tab_scanner"].config(bg=ACCENT, fg="#000000")
-        self._W["tab_profiles"].config(bg=PANEL, fg=MUTED)
-        self._W["tab_vd_profiles"].config(bg=PANEL, fg=MUTED)
+        self._set_active_tab("tab_scanner")
 
     def _show_profiles(self):
         self._scanner_view.pack_forget()
         self._vd_profiles_view.pack_forget()
         self._profiles_view.pack(fill="both", expand=True)
-        self._W["tab_scanner"].config(bg=PANEL, fg=MUTED)
-        self._W["tab_profiles"].config(bg=ACCENT, fg="#000000")
-        self._W["tab_vd_profiles"].config(bg=PANEL, fg=MUTED)
+        self._set_active_tab("tab_profiles")
         self._refresh_profiles_list()
 
     def _show_vd_profiles(self):
         self._scanner_view.pack_forget()
         self._profiles_view.pack_forget()
         self._vd_profiles_view.pack(fill="both", expand=True)
-        self._W["tab_scanner"].config(bg=PANEL, fg=MUTED)
-        self._W["tab_profiles"].config(bg=PANEL, fg=MUTED)
-        self._W["tab_vd_profiles"].config(bg=ACCENT, fg="#000000")
+        self._set_active_tab("tab_vd_profiles")
         self._vd_refresh_profiles_list()
 
     # ── PROFILES TAB ─────────────────────────────────────────────
@@ -5834,15 +5944,20 @@ class App(tk.Tk):
         cols.pack(fill="both", expand=True, padx=16, pady=14)
 
         # Left: list
-        list_frame = tk.Frame(cols, bg=CARD, width=230,
-                              highlightbackground=BORDER, highlightthickness=1)
+        list_frame = tk.Frame(cols, bg=CARD, width=300,
+                              highlightbackground=BORDER_BOLD, highlightthickness=1)
         list_frame.pack(side="left", fill="y", padx=(0, 12))
         list_frame.pack_propagate(False)
 
-        tk.Label(list_frame,
-                 text="پروفایل‌ها" if fa else "Saved Profiles",
-                 bg=BORDER, fg=MUTED, font=F(9, "bold"),
-                 padx=12, pady=7, anchor="w").pack(fill="x")
+        # List header matches mockup: padded, with "Profiles" title
+        list_hdr = tk.Frame(list_frame, bg=CARD)
+        list_hdr.pack(fill="x", padx=14, pady=(12, 10))
+        tk.Label(list_hdr,
+                 text="پروفایل‌ها" if fa else "Profiles",
+                 bg=CARD, fg=TEXT_STRONG,
+                 font=FA(13, "bold") if fa else F(13, "bold"),
+                 ).pack(side="left")
+        tk.Frame(list_frame, bg=BORDER, height=1).pack(fill="x", padx=14)
 
         list_canvas = tk.Canvas(list_frame, bg=CARD, bd=0, highlightthickness=0)
         list_scroll = ttk.Scrollbar(list_frame, orient="vertical",
@@ -6068,7 +6183,7 @@ class App(tk.Tk):
         name_lbl = tk.Label(info, text=name, bg=CARD, fg=TEXT,
                             font=F(12, "bold"),
                             anchor="w", justify="left",
-                            wraplength=240)
+                            wraplength=255)
         name_lbl.pack(fill="x")
         # Compose subline: date · N resolvers · last launched X
         meta_parts = [date, f"{cnt} resolvers"]
@@ -6077,7 +6192,7 @@ class App(tk.Tk):
         meta_lbl = tk.Label(info, text="  ·  ".join(meta_parts),
                             bg=CARD, fg=MUTED, font=F(10),
                             anchor="w", justify="left",
-                            wraplength=240)
+                            wraplength=255)
         meta_lbl.pack(fill="x", pady=(2, 0))
         tk.Frame(parent, bg=BORDER, height=1).pack(fill="x")
 
@@ -6323,15 +6438,19 @@ class App(tk.Tk):
         cols.pack(fill="both", expand=True, padx=16, pady=14)
 
         # ── Left: profile list ────────────────────────────────────
-        list_frame = tk.Frame(cols, bg=CARD, width=230,
-                              highlightbackground=BORDER, highlightthickness=1)
+        list_frame = tk.Frame(cols, bg=CARD, width=300,
+                              highlightbackground=BORDER_BOLD, highlightthickness=1)
         list_frame.pack(side="left", fill="y", padx=(0, 12))
         list_frame.pack_propagate(False)
 
-        tk.Label(list_frame,
+        list_hdr = tk.Frame(list_frame, bg=CARD)
+        list_hdr.pack(fill="x", padx=14, pady=(12, 10))
+        tk.Label(list_hdr,
                  text="پروفایل‌های VayDNS" if fa else "VayDNS Profiles",
-                 bg=BORDER, fg=MUTED, font=F(9, "bold"),
-                 padx=12, pady=7, anchor="w").pack(fill="x")
+                 bg=CARD, fg=TEXT_STRONG,
+                 font=FA(13, "bold") if fa else F(13, "bold"),
+                 ).pack(side="left")
+        tk.Frame(list_frame, bg=BORDER, height=1).pack(fill="x", padx=14)
 
         lc = tk.Canvas(list_frame, bg=CARD, bd=0, highlightthickness=0)
         ls = ttk.Scrollbar(list_frame, orient="vertical", command=lc.yview)
@@ -6591,7 +6710,7 @@ class App(tk.Tk):
         name_lbl = tk.Label(info, text=name, bg=CARD, fg=TEXT,
                             font=F(12, "bold"),
                             anchor="w", justify="left",
-                            wraplength=240)
+                            wraplength=255)
         name_lbl.pack(fill="x")
         meta_parts = [date, f"{cnt} resolvers", transport_display]
         if launched_str:
@@ -6599,7 +6718,7 @@ class App(tk.Tk):
         meta_lbl = tk.Label(info, text="  ·  ".join(meta_parts),
                             bg=CARD, fg=MUTED, font=F(10),
                             anchor="w", justify="left",
-                            wraplength=240)
+                            wraplength=255)
         meta_lbl.pack(fill="x", pady=(2, 0))
         tk.Frame(parent, bg=BORDER, height=1).pack(fill="x")
 
@@ -6887,55 +7006,70 @@ class App(tk.Tk):
     def _set_vpn_mode(self, mode: str):
         """Switch between masterdns and vaydns mode in the scanner.
 
-        The panel reshapes so only the inputs and buttons relevant to the
-        current mode are visible:
-
-          MasterDNS mode:
-            - MasterDNS Encryption Key field shown
-            - VayDNS Public Key field hidden
-            - Start Scan button shown, Scan DoH/DoT button hidden
-              (MasterDNS doesn't support encrypted transports)
-            - Save to MasterDNS Profiles button shown
-
-          VayDNS mode:
-            - VayDNS Public Key field shown
-            - MasterDNS Encryption Key field hidden
-            - Both Start Scan AND Scan DoH/DoT buttons shown
-            - Save to VayDNS Profiles button shown
+        Reshapes the panel so only the inputs and buttons relevant to
+        the current mode are visible, and updates the accent color on
+        the Connection card's bar to match the active mode. Active
+        segment in the mode selector gets a card-elevated look with
+        the role color; inactive segment stays muted.
         """
         self._vpn_mode.set(mode)
         W  = self._W
         fa = self._lang == "fa"
 
         if mode == "masterdns":
-            W["pill_master"].config(bg=BLUE, fg="#000000")
-            W["pill_vaydns"].config(bg=BORDER, fg=MUTED)
+            # Segmented control: active half lifts to CARD bg, inactive stays sunk
+            W["seg_master"].config(bg=CARD, fg=BLUE)
+            W["seg_vaydns"].config(bg=INPUT, fg=MUTED)
+            self._mode_color = BLUE
+
+            # Key field swap - keep Domain → Key → Folder order via before=
             self._vd_key_frame.pack_forget()
-            self._md_key_frame.pack(fill="x")
+            if hasattr(self, "_country_wrap") and self._country_wrap.winfo_exists():
+                self._md_key_frame.pack(fill="x", before=self._country_wrap)
+            else:
+                self._md_key_frame.pack(fill="x")
+
+            # Save button swap
             W["btn_vd_save"].pack_forget()
-            W["btn_save"].pack(fill="x", padx=2)
-            # Hide the encrypted-transports button: MasterDNS doesn't support it
+            W["btn_save"].pack(fill="x")
+
+            # Hide DoH/DoT scan button (MasterDNS doesn't use it)
             if "btn_doh_scan_wrap" in W:
                 W["btn_doh_scan_wrap"].pack_forget()
+
+            # Connection card's accent bar
+            if hasattr(self, "_c2_bar"):
+                self._c2_bar.config(bg=BLUE)
+
             # Mode hint
             if "mode_hint" in W:
                 W["mode_hint"].config(
-                    text=("اسکن resolverهای UDP/53 ایرانی برای MasterDNS"
+                    text=("اسکن resolverهای UDP/53 ایرانی برای MasterDNS VPN"
                           if fa else
-                          "Scan Iranian UDP/53 resolvers for MasterDNS"))
+                          "Scans Iranian UDP/53 resolvers for the MasterDNS multi-resolver VPN."))
         else:  # vaydns
-            W["pill_master"].config(bg=BORDER, fg=MUTED)
-            W["pill_vaydns"].config(bg=PURPLE, fg=BTN_TEXT)
+            W["seg_master"].config(bg=INPUT, fg=MUTED)
+            W["seg_vaydns"].config(bg=CARD, fg=PURPLE)
+            self._mode_color = PURPLE
+
             self._md_key_frame.pack_forget()
-            self._vd_key_frame.pack(fill="x")
+            if hasattr(self, "_country_wrap") and self._country_wrap.winfo_exists():
+                self._vd_key_frame.pack(fill="x", before=self._country_wrap)
+            else:
+                self._vd_key_frame.pack(fill="x")
+
             W["btn_save"].pack_forget()
-            W["btn_vd_save"].pack(fill="x", padx=2)
-            # Show DoH/DoT scan button: VayDNS supports UDP, DoH and DoT
+            W["btn_vd_save"].pack(fill="x")
+
             if "btn_doh_scan_wrap" in W:
-                W["btn_doh_scan_wrap"].pack(fill="x", pady=(0, 5))
+                W["btn_doh_scan_wrap"].pack(fill="x", pady=(0, 8))
+
+            if hasattr(self, "_c2_bar"):
+                self._c2_bar.config(bg=PURPLE)
+
             if "mode_hint" in W:
                 W["mode_hint"].config(
-                    text=("Start Scan = resolverهای UDP/53  |  Scan DoH/DoT = endpointهای رمزنگاری شده"
+                    text=("Start Scan = UDP/53  |  Scan DoH/DoT = endpointهای رمزنگاری شده"
                           if fa else
                           "Start Scan = UDP/53 resolvers  |  Scan DoH/DoT = encrypted endpoints"))
 
@@ -6949,299 +7083,463 @@ class App(tk.Tk):
 
     # ── LEFT PANEL ──────────────────────────────────────────────
     def _build_left(self, parent):
+        """Build the scanner's left-side input panel.
+
+        Structure follows the mockup:
+          Card 1 - VPN Engine       (segmented control + mode hint)
+          Card 2 - Connection       (domain, key/pubkey, folder)
+          Card 3 - Scan Options     (target, concurrency, timeout, pool)
+          Card 4 - Actions          (Start Scan, Stop, DoH/DoT, Save, Export, Clear)
+
+        Each card has a header strip with a colored dot (accent bar) and
+        an uppercase title, then a padded body. Cards have a 1px
+        BORDER_BOLD edge plus a subtle inner shadow simulated by being
+        one shade lighter than BG.
+        """
         W  = self._W
         fa = self._lang == "fa"
 
-        # helper: section card header
-        def card_hdr(fr, key, en, pfa, col=ACCENT):
-            lbl = tk.Label(fr, text=pfa if fa else en,
-                           bg=BORDER, fg=col,
-                           font=FA(10, "bold") if fa else F(10, "bold"),
-                           padx=12, pady=6, anchor="w")
-            lbl.pack(fill="x")
-            W[key] = lbl
+        # Cache the active "mode color" so the accent bars and active
+        # segmented-control half can pick up the right hue per-mode.
+        # The actual color refresh happens in _set_vpn_mode.
+        self._mode_color = BLUE  # default to MasterDNS color
 
-        # helper: labelled entry
-        def entry_field(parent, wkey_lbl, wkey_ent, wkey_hint,
-                        en_lbl, fa_lbl, en_hint, fa_hint,
-                        var=None, show=None):
-            fr = tk.Frame(parent, bg=CARD)
-            fr.pack(fill="x", padx=14, pady=(10, 4))
-            lbl = tk.Label(fr, text=fa_lbl if fa else en_lbl,
-                           bg=CARD, fg=TEXT,
-                           font=FA(11) if fa else F(11), anchor="w")
-            lbl.pack(fill="x")
+        # ─────────────────────────────────────────────────────────────
+        # Helpers
+        # ─────────────────────────────────────────────────────────────
+
+        def make_card(title_en, title_fa, accent_role="accent"):
+            """Create a card with a header and return its body Frame.
+
+            `accent_role` controls the color of the left accent bar in
+            the header: 'accent', 'master', or 'vaydns'. The dot is
+            stored under self._W[f'{title_key}_dot'] so _set_vpn_mode
+            can recolor it on mode switch.
+            """
+            card = tk.Frame(parent, bg=CARD,
+                            highlightbackground=BORDER_BOLD,
+                            highlightthickness=1)
+            card.pack(fill="x", pady=(0, 12))
+
+            header = tk.Frame(card, bg=CARD)
+            header.pack(fill="x", padx=14, pady=(12, 10))
+
+            # Accent bar (thin colored rectangle, left side)
+            bar = tk.Frame(header,
+                           bg={"accent": ACCENT, "master": BLUE,
+                               "vaydns": PURPLE}.get(accent_role, ACCENT),
+                           width=4, height=14)
+            bar.pack(side="left", padx=(0, 10))
+            bar.pack_propagate(False)
+
+            tk.Label(header,
+                     text=(title_fa if fa else title_en).upper(),
+                     bg=CARD, fg=MUTED,
+                     font=FA(10, "bold") if fa else F(10, "bold"),
+                     ).pack(side="left")
+
+            # Hairline under the header
+            tk.Frame(card, bg=BORDER, height=1).pack(fill="x", padx=14)
+
+            body = tk.Frame(card, bg=CARD)
+            body.pack(fill="x", padx=16, pady=(12, 14))
+            # Remember the bar so mode switching can recolor it
+            return card, body, bar
+
+        def field(parent_, label_en, label_fa,
+                  var=None, show=None, hint_en="", hint_fa="",
+                  mono=False):
+            """Labelled input. Label uppercase + small + muted; input
+            with focus ring; optional hint underneath."""
+            wrap = tk.Frame(parent_, bg=CARD)
+            wrap.pack(fill="x", pady=(0, 12))
+
+            tk.Label(wrap,
+                     text=(label_fa if fa else label_en).upper(),
+                     bg=CARD, fg=MUTED,
+                     font=FA(9, "bold") if fa else F(9, "bold"),
+                     anchor="w"
+                     ).pack(fill="x", pady=(0, 5))
+
             if var is None:
                 var = tk.StringVar()
-            kw = dict(textvariable=var, bg=INPUT, fg=TEXT,
-                      insertbackground=ACCENT, relief="flat", bd=0,
-                      font=FM(12),
-                      highlightbackground=BORDER, highlightthickness=1,
-                      highlightcolor=ACCENT)
+            font_use = FM(11) if mono else (FA(11) if fa else F(11))
+            kw = dict(textvariable=var,
+                      bg=INPUT, fg=TEXT,
+                      insertbackground=ACCENT,
+                      relief="flat", bd=0,
+                      font=font_use,
+                      highlightbackground=BORDER,
+                      highlightcolor=ACCENT,
+                      highlightthickness=1)
             if show:
                 kw["show"] = show
-            ent = tk.Entry(fr, **kw)
-            ent.pack(fill="x", ipady=10, pady=(3, 0))
-            hint = tk.Label(fr, text=fa_hint if fa else en_hint,
-                            bg=CARD, fg=MUTED,
-                            font=FA(9) if fa else F(9), anchor="w")
-            hint.pack(fill="x")
-            W[wkey_lbl]  = lbl
-            W[wkey_ent]  = ent
-            W[wkey_hint] = hint
-            return var
+            ent = tk.Entry(wrap, **kw)
+            ent.pack(fill="x", ipady=9)
 
-        # ── Card 1: Config ──
-        c1 = tk.Frame(parent, bg=CARD,
-                      highlightbackground=BORDER, highlightthickness=1)
-        c1.pack(fill="x", pady=(0, 10))
-        card_hdr(c1, "c1_hdr", "⚙  Tunnel Config", "⚙  تنظیمات تانل", ACCENT)
+            if hint_en or hint_fa:
+                tk.Label(wrap,
+                         text=hint_fa if fa else hint_en,
+                         bg=CARD, fg=HINT,
+                         font=FA(9) if fa else F(9),
+                         anchor="w", justify="left",
+                         wraplength=280
+                         ).pack(fill="x", pady=(4, 0))
+            return ent, var
 
-        # ── VPN Mode selector ──────────────────────────────────────
-        mode_frame = tk.Frame(c1, bg=CARD)
-        mode_frame.pack(fill="x", padx=14, pady=(10, 0))
-
-        tk.Label(mode_frame,
-                 text="نوع VPN" if fa else "VPN Type",
-                 bg=CARD, fg=TEXT,
-                 font=FA(11) if fa else F(11),
-                 anchor="w").pack(fill="x")
-
-        pill_row = tk.Frame(mode_frame, bg=CARD)
-        pill_row.pack(fill="x", pady=(6, 4))
+        # ─────────────────────────────────────────────────────────────
+        # Card 1: VPN Engine (segmented control)
+        # ─────────────────────────────────────────────────────────────
+        _, body, c1_bar = make_card("VPN Engine", "موتور VPN", "accent")
+        self._c1_bar = c1_bar
 
         self._vpn_mode = tk.StringVar(value="masterdns")
 
-        def make_pill(wkey, en, fa_t, value):
-            is_sel = (value == "masterdns")
-            b = tk.Button(pill_row,
-                          text=fa_t if fa else en,
-                          bg=BLUE if is_sel else BORDER,
-                          fg="#000000" if is_sel else MUTED,
-                          font=F(10, "bold"), relief="flat", bd=0,
-                          padx=20, pady=8, cursor="hand2",
-                          activebackground=BLUE, activeforeground="#000000",
-                          command=lambda v=value: self._set_vpn_mode(v))
-            b.pack(side="left", padx=(0, 6))
-            W[wkey] = b
+        # Segmented control: two halves of a tinted container, one
+        # filled with the mode's color.
+        seg_outer = tk.Frame(body, bg=INPUT,
+                             highlightbackground=BORDER,
+                             highlightthickness=1)
+        seg_outer.pack(fill="x")
 
-        make_pill("pill_master", "MasterDNS", "MasterDNS", "masterdns")
-        make_pill("pill_vaydns", "VayDNS",    "VayDNS",    "vaydns")
+        def make_seg(wkey, en, fa_t, value, role_color):
+            """Half of the segmented control. The active half gets a
+            colored bg + bold text; inactive halves stay muted."""
+            seg = tk.Label(seg_outer,
+                           text=fa_t if fa else en,
+                           bg=INPUT, fg=MUTED,
+                           font=F(11, "bold"),
+                           padx=12, pady=10,
+                           cursor="hand2")
+            seg.pack(side="left", fill="x", expand=True, padx=3, pady=3)
+            seg.bind("<Button-1>", lambda e, v=value: self._set_vpn_mode(v))
+            # Hover effect (only when not active)
+            def on_enter(e, wk=wkey):
+                if self._vpn_mode.get() != value:
+                    seg.config(fg=TEXT)
+            def on_leave(e, wk=wkey):
+                if self._vpn_mode.get() != value:
+                    seg.config(fg=MUTED)
+            seg.bind("<Enter>", on_enter)
+            seg.bind("<Leave>", on_leave)
+            W[wkey] = seg
+            # Remember the role color for repainting in _set_vpn_mode
+            seg._role_color = role_color
 
-        # Contextual hint that explains what the currently-selected mode does.
-        # Text is updated by _set_vpn_mode so the user always knows what
-        # Start Scan and Scan DoH/DoT will produce in this mode.
-        W["mode_hint"] = tk.Label(mode_frame,
+        make_seg("seg_master", "MasterDNS", "MasterDNS", "masterdns", BLUE)
+        make_seg("seg_vaydns", "VayDNS",    "VayDNS",    "vaydns",    PURPLE)
+
+        # Mode hint - one-line explanation of what scanning in this mode does
+        W["mode_hint"] = tk.Label(body,
                                    text="",  # set by _set_vpn_mode
                                    bg=CARD, fg=MUTED,
                                    font=FA(9) if fa else F(9),
                                    anchor="w", justify="left",
-                                   wraplength=320)
-        W["mode_hint"].pack(fill="x", pady=(2, 6))
+                                   wraplength=300)
+        W["mode_hint"].pack(fill="x", pady=(10, 0))
 
-        # ── MasterDNS key field (shown when masterdns selected) ──
-        self._md_key_frame = tk.Frame(c1, bg=CARD)
-        self._key_var = entry_field(
-            self._md_key_frame, "key_lbl", "key_ent", "key_hint",
-            "MasterDNS Encryption Key",  "کلید رمزنگاری MasterDNS",
-            "32-char key from server  (encrypt_key.txt)",
-            "کلید ۳۲ کاراکتری از سرور  (فایل encrypt_key.txt)")
-        # Key frame packed AFTER country/domain - see _set_vpn_mode
+        # ─────────────────────────────────────────────────────────────
+        # Card 2: Connection
+        # Field order is Domain → Key → Folder regardless of which mode
+        # is selected. We achieve this by creating both key frames now
+        # but packing them with `before=` pointing at the country wrap.
+        # ─────────────────────────────────────────────────────────────
+        _, body2, c2_bar = make_card("Connection", "اتصال", "accent")
+        self._c2_bar = c2_bar
 
-        # ── VayDNS key field (shown when vaydns selected) ────────
-        self._vd_key_frame = tk.Frame(c1, bg=CARD)
-        self._vd_pubkey_var = entry_field(
-            self._vd_key_frame, "vd_key_lbl", "vd_key_ent", "vd_key_hint",
-            "VayDNS Public Key",  "کلید عمومی VayDNS",
-            "64-char hex pubkey from server  (server.pub)",
-            "کلید عمومی ۶۴ کاراکتری hex از سرور  (server.pub)")
-        self._vd_key_frame.pack_forget()    # hidden by default
+        # Tunnel Domain (always shown, first)
+        _, self._domain_var = field(
+            body2,
+            "Tunnel Domain", "دامنه تانل",
+            hint_en="subdomain pointing to your server  (v.example.com)",
+            hint_fa="ساب‌دامین که به سرور اشاره دارد  (v.example.com)",
+        )
 
-        # Country comes before domain in the UI
-        self._country_var = entry_field(
-            c1, "country_lbl", "country_ent", "country_hint",
-            "Country / Folder", "نام کشور / پوشه",
-            "output folder name  e.g. Iran  Turkey  etc.",
-            "نام پوشه خروجی  مثال: Iran  Turkey")
+        # MasterDNS key frame and VayDNS key frame both go here, but
+        # only one is packed at a time. They sit BETWEEN domain and
+        # country (folder), which we pack LAST so it stays at the
+        # bottom even after key-frame swap.
+        self._md_key_frame = tk.Frame(body2, bg=CARD)
+        _, self._key_var = field(
+            self._md_key_frame,
+            "MasterDNS Encryption Key", "کلید رمزنگاری MasterDNS",
+            show="•",
+            hint_en="32-character shared key from your server (encrypt_key.txt)",
+            hint_fa="کلید مشترک ۳۲ کاراکتری از سرور (encrypt_key.txt)",
+            mono=True,
+        )
 
-        self._domain_var = entry_field(
-            c1, "domain_lbl", "domain_ent", "domain_hint",
-            "Tunnel Domain",  "دامنه تانل",
-            "subdomain pointing to your server  e.g. v.example.com",
-            "ساب‌دامین که به سرور اشاره دارد  مثال: v.example.com")
-        self._md_key_frame.pack(fill="x")  # default: MasterDNS selected
+        self._vd_key_frame = tk.Frame(body2, bg=CARD)
+        _, self._vd_pubkey_var = field(
+            self._vd_key_frame,
+            "VayDNS Public Key", "کلید عمومی VayDNS",
+            hint_en="64-character hex public key from server.pub",
+            hint_fa="کلید عمومی hex ۶۴ کاراکتری از server.pub",
+            mono=True,
+        )
 
-        tk.Frame(c1, bg=CARD, height=10).pack()
+        # Country / Folder - packed LAST so it stays at bottom of card
+        _, self._country_var = field(
+            body2,
+            "Output Folder", "پوشه خروجی",
+            hint_en="folder name created next to the app  (e.g. Iran)",
+            hint_fa="نام پوشه‌ای که کنار برنامه ساخته می‌شود  (مثال Iran)",
+        )
+        # Save the country wrap so _set_vpn_mode can pack key frames
+        # before it (Domain → Key → Folder ordering)
+        self._country_wrap = body2.winfo_children()[-1]
 
-        # ── Card 2: Scan Options ──
-        c2 = tk.Frame(parent, bg=CARD,
-                      highlightbackground=BORDER, highlightthickness=1)
-        c2.pack(fill="x", pady=(0, 10))
-        card_hdr(c2, "c2_hdr", "🔍  Scan Options", "🔍  تنظیمات اسکن", BLUE)
+        # Default: MasterDNS mode - pack the MD key BEFORE the country wrap
+        self._md_key_frame.pack(fill="x", before=self._country_wrap)
 
-        # Two rows of spinboxes so nothing gets cut off on narrow screens
-        spin_row1 = tk.Frame(c2, bg=CARD)
-        spin_row1.pack(fill="x", padx=14, pady=(10, 4))
-        spin_row2 = tk.Frame(c2, bg=CARD)
-        spin_row2.pack(fill="x", padx=14, pady=(0, 6))
+        # ─────────────────────────────────────────────────────────────
+        # Card 3: Scan Options
+        # ─────────────────────────────────────────────────────────────
+        _, body3, _ = make_card("Scan Options", "تنظیمات اسکن", "accent")
 
-        def spin_col(parent, wlbl, wsp, en, pfa, lo, hi, default):
-            col = tk.Frame(parent, bg=CARD)
-            col.pack(side="left", fill="x", expand=True, padx=(0, 8))
-            lbl = tk.Label(col, text=pfa if fa else en, bg=CARD, fg=MUTED,
-                           font=FA(9) if fa else F(9), anchor="w")
-            lbl.pack(fill="x")
+        # 2x2 grid of small numeric inputs - tighter than the old layout
+        opt_grid = tk.Frame(body3, bg=CARD)
+        opt_grid.pack(fill="x")
+        opt_grid.columnconfigure(0, weight=1, uniform="opt")
+        opt_grid.columnconfigure(1, weight=1, uniform="opt")
+
+        def opt_cell(row, col, wlbl, wsp, en, fa_t, lo, hi, default):
+            cell = tk.Frame(opt_grid, bg=CARD)
+            cell.grid(row=row, column=col, sticky="ew",
+                      padx=(0, 8) if col == 0 else (0, 0),
+                      pady=(0, 10))
+            tk.Label(cell,
+                     text=(fa_t if fa else en).upper(),
+                     bg=CARD, fg=MUTED,
+                     font=FA(9, "bold") if fa else F(9, "bold"),
+                     anchor="w"
+                     ).pack(fill="x", pady=(0, 4))
             var = tk.IntVar(value=default)
-            sp  = tk.Spinbox(col, from_=lo, to=hi, textvariable=var,
-                             bg=INPUT, fg=TEXT, insertbackground=ACCENT,
-                             buttonbackground=BORDER, relief="flat", bd=0,
-                             font=FM(11),
-                             highlightbackground=BORDER, highlightthickness=1,
-                             highlightcolor=ACCENT, width=5)
-            sp.pack(fill="x", ipady=8)
-            W[wlbl] = lbl
+            sp = tk.Spinbox(cell, from_=lo, to=hi, textvariable=var,
+                            bg=INPUT, fg=TEXT, insertbackground=ACCENT,
+                            buttonbackground=CARD, relief="flat", bd=0,
+                            font=FM(11),
+                            highlightbackground=BORDER,
+                            highlightcolor=ACCENT, highlightthickness=1)
+            sp.pack(fill="x", ipady=7)
+            W[wlbl] = sp
             W[wsp]  = sp
             return var
 
-        # Row 1: Target  Concurrency  Timeout
-        self._target_var  = spin_col(spin_row1, "t_lbl",  "t_sp",  "Target",       "هدف",             5,    500,  100)
-        self._conc_var    = spin_col(spin_row1, "c_lbl",  "c_sp",  "Concurrency",  "همزمانی",         10,   500,  100)
-        self._timeout_var = spin_col(spin_row1, "to_lbl", "to_sp", "Timeout (s)",  "Timeout (ثانیه)", 1,    10,     3)
-        # Row 2: Pool (full width so label is readable)
-        self._pool_var    = spin_col(spin_row2, "p_lbl",  "p_sp",  "Pool ×1000 IPs", "پول ×۱۰۰۰ IP",  10, 1000,  200)
-        # Add empty spacers to balance row 2 visually
-        tk.Frame(spin_row2, bg=CARD).pack(side="left", fill="x", expand=True, padx=(0,8))
-        tk.Frame(spin_row2, bg=CARD).pack(side="left", fill="x", expand=True)
+        self._target_var  = opt_cell(0, 0, "t_lbl",  "t_sp",  "Target",       "هدف",          5,  500, 100)
+        self._conc_var    = opt_cell(0, 1, "c_lbl",  "c_sp",  "Concurrency",  "همزمانی",     10,  500, 100)
+        self._timeout_var = opt_cell(1, 0, "to_lbl", "to_sp", "Timeout (s)",  "Timeout",       1,   10,   3)
+        self._pool_var    = opt_cell(1, 1, "p_lbl",  "p_sp",  "Pool x1k IPs", "Pool x1k",    10, 1000, 200)
 
-        tk.Frame(c2, bg=CARD, height=6).pack()
+        # ─────────────────────────────────────────────────────────────
+        # Card 4: Actions
+        # ─────────────────────────────────────────────────────────────
+        _, body4, _ = make_card("Actions", "اقدامات", "accent")
 
-        # ── Buttons ──
-        bf = tk.Frame(parent, bg=BG)
-        bf.pack(fill="x", pady=(2, 0))
-
-        def mk_btn(wkey, en, pfa, bg_c, fg_c, cmd, state="normal"):
-            act_bg = bg_c if state == "normal" else DIS_BG
-            act_fg = BTN_TEXT if state == "normal" else DIS_FG
-            wrapper = tk.Frame(bf, bg=BG)
-            wrapper.pack(fill="x", pady=(0, 5))
-            b = tk.Button(wrapper,
-                          text=pfa if fa else en,
-                          bg=act_bg, fg=act_fg,
-                          font=FA(12, "bold") if fa else F(12, "bold"),
+        def primary_btn(wkey, en, fa_t, command, role="accent"):
+            """Solid accent button - the primary call to action."""
+            color = {"accent": ACCENT, "vaydns": PURPLE, "master": BLUE,
+                     "danger": DANGER}.get(role, ACCENT)
+            wrap = tk.Frame(body4, bg=CARD)
+            wrap.pack(fill="x", pady=(0, 8))
+            b = tk.Button(wrap,
+                          text=fa_t if fa else en,
+                          bg=color, fg=BTN_TEXT,
+                          font=FA(11, "bold") if fa else F(11, "bold"),
                           relief="flat", bd=0,
-                          padx=18, pady=11,
-                          cursor="hand2" if state == "normal" else "arrow",
-                          state=state,
-                          activebackground=bg_c,
+                          padx=14, pady=10,
+                          cursor="hand2",
+                          activebackground=color,
                           activeforeground=BTN_TEXT,
                           disabledforeground=DIS_FG,
-                          command=cmd)
-            b.pack(fill="x", padx=2)
+                          command=command)
+            b.pack(fill="x")
             W[wkey] = b
-            # Also store the wrapper frame so mode-switching can show/hide
-            # entire button rows (button + its vertical padding) cleanly.
-            W[wkey + "_wrap"] = wrapper
+            W[wkey + "_wrap"] = wrap
+            return b
 
-        mk_btn("btn_scan",    "▶  Start Scan",  "▶  شروع اسکن", ACCENT, SCAN_FG, self._start_scan)
-        mk_btn("btn_stop",    "■  Stop",         "■  توقف",       DANGER, "#000000", self._stop_scan, "disabled")
-        # DoH/DoT scan only makes sense for VayDNS (MasterDNS doesn't support
-        # encrypted transports). The wrapper frame is hidden by _set_vpn_mode
-        # when the user is in MasterDNS mode.
-        mk_btn("btn_doh_scan", "🔒  Scan DoH/DoT", "🔒  اسکن DoH/DoT",
-               PURPLE, BTN_TEXT, self._start_doh_dot_scan)
-
-        # Save button frame - only the active VPN mode's button is visible
-        self._save_btn_frame = tk.Frame(bf, bg=BG)
-        self._save_btn_frame.pack(fill="x", pady=(0, 5))
-
-        def mk_save_btn(wkey, en, pfa, bg_c, fg_c, cmd):
-            b = tk.Button(self._save_btn_frame,
-                          text=pfa if fa else en,
-                          bg=DIS_BG, fg=DIS_FG,
-                          font=FA(12, "bold") if fa else F(12, "bold"),
+        def secondary_btn(wkey, en, fa_t, command, state="normal", role=None):
+            """Bordered secondary button. Optional `role` color tints
+            the text (e.g. purple for VayDNS-specific actions)."""
+            wrap = tk.Frame(body4, bg=CARD)
+            wrap.pack(fill="x", pady=(0, 8))
+            fg = {"vaydns": PURPLE, "danger": DANGER}.get(role, TEXT) if state == "normal" else DIS_FG
+            border_bg = {"vaydns": PURPLE, "danger": DANGER}.get(role, BORDER_BOLD)
+            b = tk.Button(wrap,
+                          text=fa_t if fa else en,
+                          bg=CARD_HOVER,
+                          fg=fg,
+                          font=FA(11, "bold") if fa else F(11, "bold"),
                           relief="flat", bd=0,
-                          padx=18, pady=11,
+                          padx=14, pady=10,
+                          cursor="hand2" if state == "normal" else "arrow",
+                          state=state,
+                          activebackground=CARD_HOVER,
+                          activeforeground=fg,
+                          disabledforeground=DIS_FG,
+                          highlightbackground=border_bg if state == "normal" else BORDER,
+                          highlightthickness=1,
+                          command=command)
+            b.pack(fill="x")
+            W[wkey] = b
+            W[wkey + "_wrap"] = wrap
+            return b
+
+        # Primary: Start Scan
+        primary_btn("btn_scan", "▶  Start Scan", "▶  شروع اسکن",
+                    self._start_scan)
+        # Secondary: Stop (danger-outlined, disabled by default)
+        secondary_btn("btn_stop", "■  Stop", "■  توقف",
+                      self._stop_scan, state="disabled", role="danger")
+        # VayDNS-only: Scan DoH/DoT (hidden in MasterDNS mode)
+        secondary_btn("btn_doh_scan", "🔒  Scan DoH/DoT", "🔒  اسکن DoH/DoT",
+                      self._start_doh_dot_scan, role="vaydns")
+
+        # Save button frame - only the active VPN mode's save button shows
+        self._save_btn_frame = tk.Frame(body4, bg=CARD)
+        self._save_btn_frame.pack(fill="x", pady=(0, 8))
+
+        def save_btn(wkey, en, fa_t, command, role):
+            color = {"master": BLUE, "vaydns": PURPLE}.get(role, ACCENT)
+            b = tk.Button(self._save_btn_frame,
+                          text=fa_t if fa else en,
+                          bg=DIS_BG, fg=DIS_FG,
+                          font=FA(11, "bold") if fa else F(11, "bold"),
+                          relief="flat", bd=0,
+                          padx=14, pady=10,
                           cursor="arrow",
                           state="disabled",
-                          activebackground=bg_c,
-                          activeforeground=fg_c,
+                          activebackground=color,
+                          activeforeground=BTN_TEXT,
                           disabledforeground=DIS_FG,
-                          command=cmd)
-            b.pack(fill="x", padx=2)
+                          highlightbackground=BORDER,
+                          highlightthickness=1,
+                          command=command)
+            b.pack(fill="x")
             W[wkey] = b
+            b._role_color = color
+            return b
 
-        mk_save_btn("btn_save",    "💾  Save to MasterDNS Profiles", "💾  ذخیره در MasterDNS",
-                    BLUE,   SAVE_FG, self._save_configs)
-        mk_save_btn("btn_vd_save", "💾  Save to VayDNS Profiles",    "💾  ذخیره در VayDNS",
-                    PURPLE, BTN_TEXT, self._save_vaydns_profile)
+        save_btn("btn_save",    "💾  Save to MasterDNS Profiles",
+                                "💾  ذخیره در MasterDNS",
+                 self._save_configs, "master")
+        save_btn("btn_vd_save", "💾  Save to VayDNS Profiles",
+                                "💾  ذخیره در VayDNS",
+                 self._save_vaydns_profile, "vaydns")
+        W["btn_vd_save"].pack_forget()  # default: MasterDNS save shown
 
-        # Show only the MasterDNS save button initially
-        W["btn_vd_save"].pack_forget()
+        # Export and Clear at the bottom (less common actions)
+        secondary_btn("btn_export", "📤  Export DNS List", "📤  خروجی لیست DNS",
+                      self._export_dns, state="disabled")
+        secondary_btn("btn_clear",  "🗑  Clear", "🗑  پاک کردن",
+                      self._clear)
 
-        mk_btn("btn_export",  "📤  Export DNS List", "📤  خروجی لیست DNS", WARN, BTN_TEXT, self._export_dns, "disabled")
-        mk_btn("btn_clear",   "🗑  Clear",  "🗑  پاک کردن", BORDER, CLEAR_FG, self._clear)
 
     # ── RIGHT PANEL ─────────────────────────────────────────────
     def _build_right(self, parent):
+        """Build the scanner's right-side results panel.
+
+        Layout per mockup:
+          Status bar    (pulse + status text + progress bar + count badge)
+          Results card  (treeview with mockup styling)
+          Log card      (timestamped activity feed)
+        """
         W = self._W
 
-        # Progress row
-        prog_top = tk.Frame(parent, bg=BG)
-        prog_top.pack(fill="x", pady=(0, 6))
-        W["prog_lbl"] = tk.Label(prog_top, text="Ready",
-                                  bg=BG, fg=MUTED, font=F(10))
-        W["prog_lbl"].pack(side="left")
-        W["badge"] = tk.Label(prog_top, text="0  found",
-                               bg=CARD, fg=GREEN,
-                               font=F(10, "bold"), padx=12, pady=4,
-                               relief="flat",
-                               highlightbackground=GREEN,
-                               highlightthickness=1)
+        # ── Status bar (pulse + status + progress + badge) ──────
+        status_bar = tk.Frame(parent, bg=CARD,
+                              highlightbackground=BORDER_BOLD,
+                              highlightthickness=1)
+        status_bar.pack(fill="x", pady=(0, 12))
+
+        status_inner = tk.Frame(status_bar, bg=CARD)
+        status_inner.pack(fill="x", padx=16, pady=12)
+
+        # Left: pulse dot + status text
+        status_left = tk.Frame(status_inner, bg=CARD)
+        status_left.pack(side="left")
+
+        W["status_pulse"] = tk.Label(status_left, text="●", bg=CARD,
+                                      fg=GREEN, font=F(13, "bold"))
+        W["status_pulse"].pack(side="left", padx=(0, 8))
+        W["status_lbl"] = tk.Label(status_left,
+                                    text=("آماده" if self._lang == "fa" else "Ready"),
+                                    bg=CARD, fg=TEXT,
+                                    font=F(11, "bold"))
+        W["status_lbl"].pack(side="left")
+
+        # Right: count badge
+        W["badge"] = tk.Label(status_inner,
+                               text=("0 یافت شد" if self._lang == "fa" else "0 found"),
+                               bg=ACCENT_SOFT, fg=ACCENT,
+                               font=F(10, "bold"),
+                               padx=12, pady=4)
         W["badge"].pack(side="right")
 
+        # Middle: progress bar
         style = ttk.Style()
         style.theme_use("default")
         style.configure("G.Horizontal.TProgressbar",
-                        troughcolor=BORDER, background=ACCENT,
-                        bordercolor=BORDER, thickness=14,
+                        troughcolor=INPUT, background=ACCENT,
+                        bordercolor=INPUT, thickness=6,
                         lightcolor=ACCENT, darkcolor=ACCENT)
-        W["progress"] = ttk.Progressbar(parent,
+        W["progress"] = ttk.Progressbar(status_inner,
                                          style="G.Horizontal.TProgressbar",
-                                         mode="determinate", maximum=100)
-        W["progress"].pack(fill="x", pady=(0, 10))
+                                         mode="determinate", maximum=100,
+                                         length=200)
+        W["progress"].pack(side="left", fill="x", expand=True, padx=(20, 20))
 
-        # Results card
+        # Legacy prog_lbl - some callers still use it. Hide it behind
+        # the status label since the status_lbl now carries that info.
+        W["prog_lbl"] = W["status_lbl"]
+
+        # ── Results card ────────────────────────────────────────
         res = tk.Frame(parent, bg=CARD,
-                       highlightbackground=BORDER, highlightthickness=1)
-        res.pack(fill="both", expand=True, pady=(0, 8))
+                       highlightbackground=BORDER_BOLD,
+                       highlightthickness=1)
+        res.pack(fill="both", expand=True, pady=(0, 12))
 
-        res_hdr_fr = tk.Frame(res, bg=BORDER)
-        res_hdr_fr.pack(fill="x")
+        # Card header with accent bar
+        res_hdr_fr = tk.Frame(res, bg=CARD)
+        res_hdr_fr.pack(fill="x", padx=14, pady=(12, 10))
+
+        res_bar = tk.Frame(res_hdr_fr, bg=ACCENT, width=4, height=14)
+        res_bar.pack(side="left", padx=(0, 10))
+        res_bar.pack_propagate(False)
+
         W["res_hdr"] = tk.Label(res_hdr_fr,
-                                 text="🟢  Found Resolvers",
-                                 bg=BORDER, fg=GREEN,
-                                 font=F(10, "bold"), padx=12, pady=6,
-                                 anchor="w")
-        W["res_hdr"].pack(side="left", fill="x", expand=True)
+                                 text=("نتایج" if self._lang == "fa" else "RESULTS"),
+                                 bg=CARD, fg=MUTED,
+                                 font=F(10, "bold"))
+        W["res_hdr"].pack(side="left")
+
         W["res_count"] = tk.Label(res_hdr_fr, text="",
-                                   bg=BORDER, fg=MUTED,
-                                   font=F(9), padx=10, pady=6)
+                                   bg=CARD, fg=HINT,
+                                   font=F(10))
         W["res_count"].pack(side="right")
 
+        tk.Frame(res, bg=BORDER, height=1).pack(fill="x", padx=14)
+
+        # Restyle the Treeview
         style.configure("R.Treeview",
                         background=CARD, foreground=TEXT,
-                        fieldbackground=CARD, rowheight=32,
+                        fieldbackground=CARD, rowheight=34,
                         font=FM(11),
                         borderwidth=0, relief="flat")
         style.configure("R.Treeview.Heading",
-                        background="#0d1526", foreground=ACCENT,
-                        font=F(10, "bold"), padding=(8, 6))
+                        background=BG_ELEVATED, foreground=MUTED,
+                        font=F(9, "bold"),
+                        padding=(10, 8),
+                        relief="flat",
+                        borderwidth=0)
         style.map("R.Treeview",
-                  background=[("selected", "#1e3a60")],
-                  foreground=[("selected", "#ffffff")])
+                  background=[("selected", ACCENT_SOFT)],
+                  foreground=[("selected", ACCENT)])
+        style.map("R.Treeview.Heading",
+                  background=[("active", BG_ELEVATED)])
 
         tv_fr = tk.Frame(res, bg=CARD)
-        tv_fr.pack(fill="both", expand=True)
+        tv_fr.pack(fill="both", expand=True, padx=2, pady=2)
 
         W["tree"] = ttk.Treeview(tv_fr, columns=("ip", "score", "ms", "detail"),
                                   show="headings", style="R.Treeview")
@@ -7249,8 +7547,8 @@ class App(tk.Tk):
         W["tree"].heading("score",  text="Score")
         W["tree"].heading("ms",     text="ms")
         W["tree"].heading("detail", text="Checks")
-        W["tree"].column("ip",     width=150, anchor="w")
-        W["tree"].column("score",  width=60,  anchor="center")
+        W["tree"].column("ip",     width=180, anchor="w")
+        W["tree"].column("score",  width=70,  anchor="center")
         W["tree"].column("ms",     width=70,  anchor="center")
         W["tree"].column("detail", width=380, anchor="w")
         vsb = ttk.Scrollbar(tv_fr, orient="vertical",
@@ -7259,12 +7557,10 @@ class App(tk.Tk):
         vsb.pack(side="right", fill="y")
         W["tree"].pack(side="left", fill="both", expand=True)
 
-        # Right-click context menu - Copy IP, Copy all IPs, Open in browser.
-        # Right-click on macOS is Button-2 (single-button mice) or Button-3
-        # (multi-button + trackpad two-finger). Bind both.
+        # Right-click context menu
         self._tree_menu = tk.Menu(self, tearoff=False, bg=CARD, fg=TEXT,
-                                  activebackground=ACCENT,
-                                  activeforeground="#000000")
+                                  activebackground=ACCENT_SOFT,
+                                  activeforeground=ACCENT)
         self._tree_menu.add_command(
             label="Copy IP", command=self._tree_copy_selected_ip)
         self._tree_menu.add_command(
@@ -7282,24 +7578,39 @@ class App(tk.Tk):
             finally:
                 self._tree_menu.grab_release()
 
-        W["tree"].bind("<Button-3>", _on_right_click)   # Linux / Windows / mac multi-button
-        W["tree"].bind("<Button-2>", _on_right_click)   # macOS single-button
-        # Control-click on macOS also brings up context menu
+        W["tree"].bind("<Button-3>", _on_right_click)
+        W["tree"].bind("<Button-2>", _on_right_click)
         W["tree"].bind("<Control-Button-1>", _on_right_click)
 
-        # Log card
+        # ── Log card ────────────────────────────────────────────
         log_card = tk.Frame(parent, bg=CARD,
-                            highlightbackground=BORDER, highlightthickness=1)
+                            highlightbackground=BORDER_BOLD,
+                            highlightthickness=1)
         log_card.pack(fill="x")
-        tk.Label(log_card, text="📋  Log",
-                 bg=BORDER, fg=MUTED,
-                 font=F(10, "bold"), padx=12, pady=5, anchor="w").pack(fill="x")
+
+        log_hdr_fr = tk.Frame(log_card, bg=CARD)
+        log_hdr_fr.pack(fill="x", padx=14, pady=(12, 10))
+
+        log_bar = tk.Frame(log_hdr_fr, bg=ACCENT, width=4, height=14)
+        log_bar.pack(side="left", padx=(0, 10))
+        log_bar.pack_propagate(False)
+
+        tk.Label(log_hdr_fr,
+                 text=("فعالیت" if self._lang == "fa" else "ACTIVITY"),
+                 bg=CARD, fg=MUTED,
+                 font=F(10, "bold")
+                 ).pack(side="left")
+
+        tk.Frame(log_card, bg=BORDER, height=1).pack(fill="x", padx=14)
+
         W["log"] = scrolledtext.ScrolledText(
             log_card, height=7,
-            bg="#0a0f1e", fg="#7a9cc0",
+            bg=INPUT, fg=MUTED,
             insertbackground=ACCENT,
-            font=FM(10), relief="flat", bd=0, state="disabled")
+            font=FM(10), relief="flat", bd=0, state="disabled",
+            padx=12, pady=10)
         W["log"].pack(fill="both", padx=2, pady=2)
+
 
     # ── LANGUAGE ────────────────────────────────────────────────
     def _toggle_lang(self):
@@ -7308,165 +7619,188 @@ class App(tk.Tk):
 
     # ── THEME ───────────────────────────────────────────────────
     def _toggle_theme(self):
-        """Flip between dark and light theme, live.
+        """Switch theme preference and prompt the user to restart.
 
-        Persists the new preference so the next launch matches. We also
-        rewrite the toggle button glyph (sun in dark mode, moon in light
-        mode) so the icon tells the user what clicking does next."""
+        Earlier versions attempted a live re-color but Tkinter doesn't
+        have a real theme system - widget colors are baked in at
+        creation time, ttk widgets ignore `bg`/`fg` entirely, and
+        hover/selected/disabled states have their own colors that
+        the walker couldn't reach. The result was a half-themed UI
+        that looked worse than the consistent old theme.
+
+        The honest fix: persist the preference and tell the user a
+        restart is required. The toast self-dismisses after 4 seconds.
+        """
         new_name = "light" if current_theme() == "dark" else "dark"
-        _load_theme(new_name)
         try:
             s = load_settings()
             s["theme"] = new_name
             save_settings(s)
         except Exception:
             pass
-        self._apply_theme_to_tree()
-        # Update the toggle glyph to point at the OTHER theme (the one
-        # clicking would switch to)
+        # Update the toggle glyph immediately so the click registers
         try:
             self._W["btn_theme"].config(
                 text="☀" if new_name == "dark" else "☾",
-                bg=BORDER, fg=TEXT,
             )
         except Exception:
             pass
+        # Show a small toast at the bottom of the window
+        self._show_toast(
+            text=("تم تغییر کرد. برای اعمال، برنامه را دوباره باز کنید."
+                  if self._lang == "fa" else
+                  f"Switched to {new_name} theme. Restart KevinNet to apply."),
+            duration_ms=4500,
+        )
 
-    def _apply_theme_to_tree(self):
-        """Walk the live Tk widget tree and re-apply colors from the
-        active palette.
+    def _show_toast(self, text: str, duration_ms: int = 3000):
+        """Show a brief floating message at the bottom of the window.
 
-        This is necessarily imperfect because Tkinter doesn't have a
-        proper theme system - widget colors are stored at .config() time,
-        so we have to visit every widget and re-color it. Buttons keep
-        their semantic color (the Stop button stays red regardless of
-        theme); only background/text colors swap.
-
-        A handful of widgets reference colors that the walker can't
-        infer (e.g. a Label whose `fg` was set to ACCENT specifically).
-        For those, the visual will look correct after the next user
-        interaction repaints them, or after restart. The preference is
-        persisted so reopening always looks right.
-        """
-        # Recolor the root window
+        Self-dismisses after duration_ms. Used for non-blocking
+        confirmations like theme-changed-restart-required where a
+        modal dialog would be annoying."""
         try:
-            self.configure(bg=BG)
+            toast = tk.Toplevel(self)
+            toast.overrideredirect(True)
+            toast.configure(bg=CARD)
+            try:
+                toast.attributes("-topmost", True)
+            except Exception:
+                pass
+            inner = tk.Frame(toast, bg=CARD,
+                             highlightbackground=ACCENT,
+                             highlightthickness=1)
+            inner.pack(fill="both", expand=True)
+            tk.Label(inner, text=text,
+                     bg=CARD, fg=TEXT,
+                     font=FA(11) if self._lang == "fa" else F(11),
+                     padx=18, pady=12).pack()
+            # Position centered horizontally near the bottom
+            self.update_idletasks()
+            tw = toast.winfo_reqwidth()
+            th = toast.winfo_reqheight()
+            x = self.winfo_x() + (self.winfo_width()  - tw) // 2
+            y = self.winfo_y() + self.winfo_height() - th - 60
+            toast.geometry(f"+{x}+{y}")
+            toast.after(duration_ms, toast.destroy)
         except Exception:
             pass
 
-        def _walk(widget):
-            try:
-                cls = widget.winfo_class()
-            except Exception:
-                return
-            try:
-                if cls in ("Frame", "Labelframe", "Toplevel", "Canvas"):
-                    cur_bg = str(widget.cget("bg"))
-                    # Map old palette → new palette by role inference.
-                    # If the widget's current bg matches one of our role
-                    # colors, swap to the corresponding new-palette color.
-                    new_bg = _remap_color(cur_bg)
-                    if new_bg:
-                        widget.configure(bg=new_bg)
-                elif cls == "Label":
-                    cur_bg = str(widget.cget("bg"))
-                    cur_fg = str(widget.cget("fg"))
-                    new_bg = _remap_color(cur_bg)
-                    new_fg = _remap_color(cur_fg)
-                    if new_bg: widget.configure(bg=new_bg)
-                    if new_fg: widget.configure(fg=new_fg)
-                elif cls == "Entry":
-                    widget.configure(bg=INPUT, fg=TEXT, insertbackground=TEXT,
-                                     highlightbackground=BORDER)
-                elif cls == "Text":
-                    widget.configure(bg=INPUT, fg=TEXT, insertbackground=TEXT,
-                                     highlightbackground=BORDER)
-                elif cls == "Button":
-                    # Map button bg only if it's a generic surface color.
-                    # Action-colored buttons (accent/danger/etc.) keep
-                    # their role color but we still need to refresh in
-                    # case the role color itself changed between palettes.
-                    cur_bg = str(widget.cget("bg"))
-                    cur_fg = str(widget.cget("fg"))
-                    new_bg = _remap_color(cur_bg)
-                    new_fg = _remap_color(cur_fg)
-                    if new_bg: widget.configure(bg=new_bg, activebackground=new_bg)
-                    if new_fg: widget.configure(fg=new_fg, activeforeground=new_fg)
-            except Exception:
-                # Some Ttk widgets reject `bg` etc.; that's fine
-                pass
-            try:
-                for child in widget.winfo_children():
-                    _walk(child)
-            except Exception:
-                pass
-
-        _walk(self)
-
-
     def _refresh_lang(self):
+        """Update all language-dependent labels after a language switch.
+
+        With the v4.0.0 card-based UI, the cleanest approach is to
+        rebuild the scanner left/right panels from scratch (they're
+        cheap to construct, and rebuilding guarantees no stale text).
+        Profile tabs are refreshed on next selection.
+
+        Top-bar buttons (Help, Lang, Theme) update in place since they
+        have stable widget keys.
+        """
         fa = self._lang == "fa"
         W  = self._W
-        ff = FA if fa else F
 
-        W["btn_lang"].config(text="English" if fa else "فارسی",
-                             fg=ACCENT, font=FA(10, "bold"))
-        W["btn_help"].config(text="؟  راهنما" if fa else "?  Help",
-                             fg=TEXT,   font=FA(10, "bold"))
+        # ── Top-bar buttons: easy, single widgets ──
+        try:
+            W["btn_lang"].config(text="English" if fa else "فارسی",
+                                  fg=ACCENT,
+                                  font=FA(11, "bold") if fa else F(11, "bold"))
+        except Exception:
+            pass
+        try:
+            W["btn_help"].config(text="؟" if fa else "?",
+                                  font=FA(12, "bold") if fa else F(12, "bold"))
+        except Exception:
+            pass
 
-        W["c1_hdr"].config(text="⚙  تنظیمات تانل"   if fa else "⚙  Tunnel Config",
-                           font=ff(10, "bold"))
-        W["c2_hdr"].config(text="🔍  تنظیمات اسکن"  if fa else "🔍  Scan Options",
-                           font=ff(10, "bold"))
-
-        for wlbl, whin, fa_t, en_t, fa_h, en_h in [
-            ("domain_lbl",  "domain_hint",
-             "دامنه تانل",     "Tunnel Domain",
-             "مثال:  v.example.com", "e.g.  v.example.com"),
-            ("key_lbl",     "key_hint",
-             "کلید رمزنگاری",  "Encryption Key",
-             "کلید ۳۲ کاراکتری", "32-char key"),
-            ("country_lbl", "country_hint",
-             "نام کشور / پوشه", "Country / Folder",
-             "مثال:  Iran",    "e.g.  Iran"),
+        # ── Tab bar ──
+        for wkey, en, fa_t in [
+            ("tab_scanner",     "Scanner",            "اسکنر"),
+            ("tab_profiles",    "MasterDNS Profiles", "MasterDNS Profiles"),
+            ("tab_vd_profiles", "VayDNS Profiles",    "VayDNS Profiles"),
         ]:
-            W[wlbl].config(text=fa_t if fa else en_t, font=ff(11))
-            W[whin].config(text=fa_h if fa else en_h, font=ff(9))
+            if wkey in W:
+                try:
+                    W[wkey].config(text=fa_t if fa else en,
+                                    font=FA(12, "bold") if fa else F(12, "bold"))
+                except Exception:
+                    pass
 
-        for wlbl, fa_t, en_t in [
-            ("t_lbl",  "هدف",            "Target"),
-            ("c_lbl",  "همزمانی",         "Concurrency"),
-            ("to_lbl", "Timeout (ثانیه)", "Timeout (s)"),
-            ("p_lbl",  "پول (×۱۰۰۰)",    "Pool (x1000)"),
-        ]:
-            W[wlbl].config(text=fa_t if fa else en_t, font=ff(9))
+        # ── Rebuild the scanner panel ──
+        # The cards have inline labels that aren't easily addressable
+        # by key. Tear down and rebuild — fast and bug-free.
+        try:
+            # Preserve current values across rebuild
+            saved = {
+                "domain":  self._domain_var.get(),
+                "key":     self._key_var.get(),
+                "pubkey":  self._vd_pubkey_var.get(),
+                "country": self._country_var.get(),
+                "mode":    self._vpn_mode.get(),
+                "target":  self._target_var.get(),
+                "conc":    self._conc_var.get(),
+                "timeout": self._timeout_var.get(),
+                "pool":    self._pool_var.get(),
+            }
+            # Destroy and rebuild left panel
+            for child in self._scanner_view.winfo_children():
+                child.destroy()
+            self._rebuild_scanner_view()
+            # Restore values
+            self._domain_var.set(saved["domain"])
+            self._key_var.set(saved["key"])
+            self._vd_pubkey_var.set(saved["pubkey"])
+            self._country_var.set(saved["country"])
+            self._target_var.set(saved["target"])
+            self._conc_var.set(saved["conc"])
+            self._timeout_var.set(saved["timeout"])
+            self._pool_var.set(saved["pool"])
+            # Re-apply mode reshape with restored selection
+            self._set_vpn_mode(saved["mode"])
+        except Exception as e:
+            # If anything goes wrong, log it; lang switch is non-critical
+            try:
+                self._log(f"language refresh: {e}")
+            except Exception:
+                pass
 
-        h_fa = "پیشنهاد ایران: Target=100  Concurrency<=80  Timeout=3s  Pool=200-500\n"                "Resolver kam? Pool raa bala bebrid ya eskan chand bar ejra konid"
-        h_en = "Iran recommended: Target=100  Concurrency<=80  Timeout=3s  Pool=200-500\n"                "Finding few resolvers? Increase Pool or run scan multiple times"
-        if "scan_hint" in W:
-            W["scan_hint"].config(text=h_fa if fa else h_en, font=ff(8))
-        if "log_hdr_lbl" in W:
-            W["log_hdr_lbl"].config(text="📋  گزارش فعالیت" if fa else "📋  Activity Log",
-                                    font=ff(10, "bold"))
+    def _rebuild_scanner_view(self):
+        """Reconstruct the scanner view (left + right) from scratch.
 
-        for wkey, fa_t, en_t in [
-            ("btn_scan",    "▶  شروع اسکن",           "▶  Start Scan"),
-            ("btn_stop",    "■  توقف",                "■  Stop"),
-            ("btn_save",    "💾  ذخیره در MasterDNS", "💾  Save to MasterDNS Profiles"),
-            ("btn_vd_save", "💾  ذخیره در VayDNS",    "💾  Save to VayDNS Profiles"),
-            ("btn_export",  "📤  خروجی لیست DNS",     "📤  Export DNS List"),
-            ("vd_key_lbl",  "کلید عمومی VayDNS",      "VayDNS Public Key"),
-            ("pill_master", "MasterDNS",               "MasterDNS"),
-            ("pill_vaydns", "VayDNS",                  "VayDNS"),
-            ("btn_clear",   "🗑  پاک کردن",            "🗑  Clear"),
-        ]:
-            W[wkey].config(text=fa_t if fa else en_t,
-                           font=ff(12, "bold"))
+        Called after language switch. Mirrors the original layout
+        creation in _build_ui."""
+        body = self._scanner_view
 
-        n = len(self._found_ips)
-        W["res_hdr"].config(
-            text="🟢  Resolver های تایید شده (۵/۶ یا ۶/۶)" if fa else "🟢  Verified Resolvers (5/6 or 6/6)")
-        W["badge"].config(text=f"{n}  {'یافت‌شده' if fa else 'found'}")
+        # Left panel
+        left_outer = tk.Frame(body, bg=BG, width=360)
+        left_outer.pack(side="left", fill="y", padx=(16, 8), pady=16)
+        left_outer.pack_propagate(False)
+
+        left_canvas = tk.Canvas(left_outer, bg=BG, bd=0,
+                                highlightthickness=0, width=340)
+        left_scroll = ttk.Scrollbar(left_outer, orient="vertical",
+                                    command=left_canvas.yview)
+        left_scroll.pack(side="right", fill="y")
+        left_canvas.pack(side="left", fill="both", expand=True)
+
+        left = tk.Frame(left_canvas, bg=BG)
+        left_win = left_canvas.create_window((0, 0), window=left,
+                                              anchor="nw", width=340)
+
+        def _on_left_configure(e):
+            left_canvas.configure(scrollregion=left_canvas.bbox("all"))
+        def _on_canvas_resize(e):
+            left_canvas.itemconfig(left_win, width=e.width)
+        left.bind("<Configure>", _on_left_configure)
+        left_canvas.bind("<Configure>", _on_canvas_resize)
+        left_canvas.configure(yscrollcommand=left_scroll.set)
+
+        self._build_left(left)
+
+        right = tk.Frame(body, bg=BG)
+        right.pack(side="left", fill="both", expand=True,
+                   padx=(0, 16), pady=16)
+        self._build_right(right)
 
     # ── LOG ─────────────────────────────────────────────────────
     def _log(self, msg):
@@ -7554,7 +7888,7 @@ class App(tk.Tk):
         self._stop_ev.clear()
         self._scanning = True
         self._W["btn_scan"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
-        self._W["btn_stop"].config(state="normal",   bg=DANGER, fg="#000000", disabledforeground=DIS_FG)
+        self._W["btn_stop"].config(state="normal",   bg=DANGER, fg=BTN_TEXT, disabledforeground=DIS_FG)
         self._W["btn_save"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
         self._W["progress"]["value"] = 0
         self._W["status_lbl"].config(text="● Scanning…", fg=WARN)
@@ -7709,11 +8043,11 @@ class App(tk.Tk):
             self._run_e2e_auto()
         else:
             # No results or stopped - just enable save if anything found
-            self._W["btn_scan"].config(state="normal",  bg=ACCENT,  fg="#000000", disabledforeground=DIS_FG)
+            self._W["btn_scan"].config(state="normal",  bg=ACCENT,  fg=BTN_TEXT, disabledforeground=DIS_FG)
             if found:
                 mode = self._vpn_mode.get()
                 if mode == "masterdns":
-                    self._W["btn_save"].config(state="normal", bg=BLUE, fg="#000000", disabledforeground=DIS_FG)
+                    self._W["btn_save"].config(state="normal", bg=BLUE, fg=BTN_TEXT, disabledforeground=DIS_FG)
                 else:
                     self._W["btn_vd_save"].config(state="normal", bg=PURPLE, fg=BTN_TEXT, disabledforeground=DIS_FG)
             self._W["status_lbl"].config(
@@ -7726,9 +8060,9 @@ class App(tk.Tk):
         domain = self._domain_var.get().strip()
 
         if not domain or not self._found_ips:
-            self._W["btn_scan"].config(state="normal",  bg=ACCENT,  fg="#000000", disabledforeground=DIS_FG)
+            self._W["btn_scan"].config(state="normal",  bg=ACCENT,  fg=BTN_TEXT, disabledforeground=DIS_FG)
             if self._found_ips:
-                self._W["btn_save"].config(state="normal",  bg=BLUE,   fg="#000000", disabledforeground=DIS_FG)
+                self._W["btn_save"].config(state="normal",  bg=BLUE,   fg=BTN_TEXT, disabledforeground=DIS_FG)
             return
 
         timeout = float(self._timeout_var.get())
@@ -7794,7 +8128,7 @@ class App(tk.Tk):
         self._scanning = True
         self._W["btn_scan"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
         self._W["btn_doh_scan"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
-        self._W["btn_stop"].config(state="normal", bg=DANGER, fg="#000000", disabledforeground=DIS_FG)
+        self._W["btn_stop"].config(state="normal", bg=DANGER, fg=BTN_TEXT, disabledforeground=DIS_FG)
         self._W["status_lbl"].config(
             text="● DoH/DoT scanning…", fg=WARN)
         self._log(
@@ -7845,7 +8179,7 @@ class App(tk.Tk):
     def _stop_scan(self):
         self._stop_ev.set()
         self._W["btn_stop"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
-        self._W["btn_scan"].config(state="normal",   bg=ACCENT,  fg="#000000", disabledforeground=DIS_FG)
+        self._W["btn_scan"].config(state="normal",   bg=ACCENT,  fg=BTN_TEXT, disabledforeground=DIS_FG)
         if "btn_doh_scan" in self._W:
             self._W["btn_doh_scan"].config(
                 state="normal", bg=PURPLE, fg=BTN_TEXT,
@@ -7868,7 +8202,7 @@ class App(tk.Tk):
         fa = self._lang == "fa"
         self._W["badge"].config(text=f"0  {'یافت‌شده' if fa else 'found'}")
         self._W["status_lbl"].config(text="● Ready", fg=GREEN)
-        self._W["btn_save"].config(state="disabled",    bg="#1a2a4a")
+        self._W["btn_save"].config(state="disabled",    bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
         self._W["btn_vd_save"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
         self._W["btn_export"].config(state="disabled",  bg=DIS_BG, fg=DIS_FG, cursor="arrow", disabledforeground=DIS_FG)
         self._W["btn_scan"].config(state="normal",       bg=ACCENT)

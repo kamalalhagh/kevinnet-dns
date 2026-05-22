@@ -19,13 +19,17 @@ and a real expansion of what KevinNet can scan and save.
 
 ### Highlights at a glance
 
+- **Complete visual redesign** with new design system: card-based layout
+  with accent bars, segmented control for VPN mode, restyled tab bar
+  with underline indicator, branded top bar with logo mark, modern
+  status bar with pulse indicator and progress bar
 - New **light theme** with toggle, plus automatic detection of the OS
   appearance setting
 - New **Scan DoH/DoT** button that probes encrypted DNS endpoints
   (much harder for Iranian DPI to fingerprint than plain UDP/53)
 - DoH/DoT scan results save directly into VayDNS profiles
 - New **HTML help file** opens in your browser, themed to match the app
-- **87 unit tests** now run in CI before any release build
+- **92 unit tests** now run in CI before any release build
 - Profile rows no longer truncate long names or wrap metadata badly
 - All MasterDNS encryption keys and config files are now created with
   restrictive permissions on Linux/macOS
@@ -34,6 +38,46 @@ and a real expansion of what KevinNet can scan and save.
 - Em-dashes and decorative emoji removed throughout
 
 ### Added
+
+#### Visual design
+
+- **Iranian Sky palette** with proper dark and light themes. Dark
+  uses deep `#0E1419` backgrounds with `#1A2128` elevated cards;
+  light uses warm `#FAFAF5` background with pure white cards. Teal
+  `#14B8A6` accent throughout, with blue for MasterDNS, purple for
+  VayDNS, plus rose, lime, orange for status states.
+- **Branded top bar** with square teal logo mark + wordmark +
+  vertical divider + tagline. Replaces the previous flat colored
+  text-only top bar.
+- **Icon-based action buttons** in the top right - Help (`?`),
+  theme toggle (sun/moon), and language pill - styled like a
+  cohesive set with hover states.
+- **Underlined tab bar** with accent text for the active tab and
+  a 2px accent underline. Hover state subtly brightens inactive
+  tabs. Cleaner than the previous flat colored-pill approach.
+- **Card-based scanner panel** with four cards (VPN Engine,
+  Connection, Scan Options, Actions). Each card has a colored
+  accent bar in its header. The Connection card's accent bar
+  recolors to match the active mode (blue for MasterDNS, purple
+  for VayDNS).
+- **Segmented control** for MasterDNS / VayDNS mode selection.
+  The active half lifts visually to the card background with its
+  mode color; inactive half stays sunk in the input shade. Cleaner
+  than the previous pair of independent pills.
+- **Form fields with uppercase labels, monospace inputs where
+  appropriate, and focus rings.** Hints wrap properly instead of
+  being clipped at the right edge.
+- **Status bar above results** with a pulse dot, status text,
+  inline progress bar, and a tinted count badge. Replaces the
+  three separate widgets the old layout had.
+- **Restyled Treeview** with proper column header styling that
+  matches the card aesthetic, hover row highlights, and accent-tinted
+  selection.
+- **Wider profile list pane** (300px instead of 230) so names with
+  3+ hyphenated parts fit on one line. Names that DO overflow wrap
+  cleanly to a second line instead of being clipped.
+
+#### Functionality
 
 - **Scan DoH/DoT button** (visible only in VayDNS mode) tests 25 DoH
   endpoints and 18 DoT endpoints. Working endpoints stream into the
@@ -134,6 +178,24 @@ and a real expansion of what KevinNet can scan and save.
   JSONs (now protected by file permissions on Unix). Moving to
   OS-native keystores (Windows DPAPI, macOS Keychain, Linux Secret
   Service) is planned for a future release.
+
+### Known limitations
+
+- **Theme switching requires a restart.** Tkinter doesn't have a real
+  theme system - widget colors are baked in at creation time, ttk
+  widgets ignore bg/fg overrides, and hover/selected states have
+  their own colors. Attempts at live re-coloring left the UI in a
+  half-themed state that looked worse than picking a side. The
+  theme toggle now shows a toast confirming the preference was
+  saved and a restart will apply it.
+- **Profile detail panels (right side of MasterDNS / VayDNS Profiles
+  tabs) still use the v3.2.2 visual design**, not the new card
+  system. The profile rows in the left list ARE redesigned. A full
+  profile-detail port is deferred to a future release to keep this
+  push reviewable.
+- **Profile tabs don't rebuild on language switch.** Labels in
+  the detail panels stay in whatever language was active when the
+  tab was first built. Pre-existing behavior, not introduced here.
 
 ### Notes for distributors
 

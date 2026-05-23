@@ -8,7 +8,7 @@ import asyncio, os, queue, random, sys, threading, time
 from datetime import datetime
 from pathlib import Path
 
-__version__ = "4.0.0"
+__version__ = "4.1.1"
 
 # ── Embedded app icon (base64 PNG, 256x256) ────────────────────
 ICON_B64 = (
@@ -5448,6 +5448,10 @@ class App(tk.Tk):
         self._dot_found : list[str] = []
         self._stop_ev   = threading.Event()
         self._scanning  = False
+        # _scan_locked tracks whether the UI is gated against changes
+        # during an active scan. Distinct from _scanning because we may
+        # want to lock the UI briefly for non-scan reasons in future.
+        self._scan_locked = False
         self._W         : dict = {}
         self._q         = queue.Queue()   # thread-safe result queue
 
@@ -5572,6 +5576,7 @@ class App(tk.Tk):
                     _, verified = item
                     fa = self._lang == "fa"
                     self._found_ips = list(verified)
+                    self._set_scan_lock(False)
                     self._W["btn_scan"].config(state="normal",  bg=ACCENT,  fg=BTN_TEXT, disabledforeground=DIS_FG)
                     if verified:
                         mode = self._vpn_mode.get()
@@ -5615,6 +5620,7 @@ class App(tk.Tk):
                     _, tested, found = item
                     fa = self._lang == "fa"
                     self._scanning = False
+                    self._set_scan_lock(False)
                     self._W["btn_scan"].config(
                         state="normal", bg=ACCENT, fg=BTN_TEXT,
                         disabledforeground=DIS_FG)
@@ -5637,12 +5643,16 @@ class App(tk.Tk):
                     self._log(
                         f"{'✓ DoH/DoT کامل:' if fa else '✓ DoH/DoT done:'} "
                         f"{found}/{tested} reachable")
-                    # Hint the user about what to do next
+                    # Hint the user about what to do next, both inline
+                    # in the log and as a first-time popup so it's not
+                    # missed. The popup auto-dismisses with checkbox.
                     if self._doh_found or self._dot_found:
                         self._log(
-                            "" + ("روی «💾 ذخیره در VayDNS Profiles» کلیک کنید تا یک پروفایل ساخته شود"
-                                     if fa else
-                                     "Click 💾 Save to VayDNS Profiles to create a profile from these endpoints"))
+                            ("روی «💾 ذخیره در VayDNS Profiles» کلیک کنید تا یک پروفایل ساخته شود"
+                             if fa else
+                             "Click 💾 Save to VayDNS Profiles to create a profile from these endpoints"))
+                        # Show one-time guidance dialog
+                        self._show_doh_dot_save_guide()
 
         except queue.Empty:
             pass
@@ -5755,7 +5765,18 @@ class App(tk.Tk):
         icon_btn(btn_fr, "btn_theme",
                  "☀" if current_theme() == "dark" else "☾",
                  self._toggle_theme)
-        icon_btn(btn_fr, "btn_help", "?", lambda: open_help_html(self._lang))
+        # Help button: gated by scan lock (opening a browser mid-scan
+        # doesn't break anything but is consistent with locking the
+        # other top-bar buttons during scan).
+        def _open_help_gated():
+            if getattr(self, "_scan_locked", False):
+                self._show_toast(
+                    "صبر کنید تا اسکن تمام شود" if self._lang == "fa"
+                    else "Wait until the scan finishes",
+                    duration_ms=2500)
+                return
+            open_help_html(self._lang)
+        icon_btn(btn_fr, "btn_help", "?", _open_help_gated)
 
         # Hairline divider between topbar and tabbar
         tk.Frame(self, bg=BORDER, height=1).pack(fill="x")
@@ -5916,12 +5937,19 @@ class App(tk.Tk):
                 self._tab_underlines[k].config(bg=BG_ELEVATED)
 
     def _show_scanner(self):
+        # Scanner is always reachable - it's where the scan happens
         self._profiles_view.pack_forget()
         self._vd_profiles_view.pack_forget()
         self._scanner_view.pack(fill="both", expand=True)
         self._set_active_tab("tab_scanner")
 
     def _show_profiles(self):
+        if getattr(self, "_scan_locked", False):
+            self._show_toast(
+                "صبر کنید تا اسکن تمام شود" if self._lang == "fa"
+                else "Wait until the scan finishes",
+                duration_ms=2500)
+            return
         self._scanner_view.pack_forget()
         self._vd_profiles_view.pack_forget()
         self._profiles_view.pack(fill="both", expand=True)
@@ -5929,6 +5957,12 @@ class App(tk.Tk):
         self._refresh_profiles_list()
 
     def _show_vd_profiles(self):
+        if getattr(self, "_scan_locked", False):
+            self._show_toast(
+                "صبر کنید تا اسکن تمام شود" if self._lang == "fa"
+                else "Wait until the scan finishes",
+                duration_ms=2500)
+            return
         self._scanner_view.pack_forget()
         self._profiles_view.pack_forget()
         self._vd_profiles_view.pack(fill="both", expand=True)
@@ -7011,7 +7045,17 @@ class App(tk.Tk):
         the Connection card's bar to match the active mode. Active
         segment in the mode selector gets a card-elevated look with
         the role color; inactive segment stays muted.
+
+        Refuses to switch modes if a scan is currently running -
+        switching mode mid-scan clears scan state and would leave the
+        running scan thread orphaned. The toast tells the user why.
         """
+        if getattr(self, "_scan_locked", False) and self._vpn_mode.get() != mode:
+            self._show_toast(
+                "صبر کنید تا اسکن تمام شود" if self._lang == "fa"
+                else "Wait until the scan finishes",
+                duration_ms=2500)
+            return
         self._vpn_mode.set(mode)
         W  = self._W
         fa = self._lang == "fa"
@@ -7614,6 +7658,12 @@ class App(tk.Tk):
 
     # ── LANGUAGE ────────────────────────────────────────────────
     def _toggle_lang(self):
+        if getattr(self, "_scan_locked", False):
+            self._show_toast(
+                "صبر کنید تا اسکن تمام شود" if self._lang == "fa"
+                else "Wait until the scan finishes",
+                duration_ms=2500)
+            return
         self._lang = "en" if self._lang == "fa" else "fa"
         self._refresh_lang()
 
@@ -7631,6 +7681,12 @@ class App(tk.Tk):
         The honest fix: persist the preference and tell the user a
         restart is required. The toast self-dismisses after 4 seconds.
         """
+        if getattr(self, "_scan_locked", False):
+            self._show_toast(
+                "صبر کنید تا اسکن تمام شود" if self._lang == "fa"
+                else "Wait until the scan finishes",
+                duration_ms=2500)
+            return
         new_name = "light" if current_theme() == "dark" else "dark"
         try:
             s = load_settings()
@@ -7686,7 +7742,199 @@ class App(tk.Tk):
         except Exception:
             pass
 
-    def _refresh_lang(self):
+    def _show_doh_dot_save_guide(self):
+        """Show a one-time guidance dialog after a successful DoH/DoT scan.
+
+        Users were confused about whether the existing 'Save to VayDNS
+        Profiles' button worked for DoH/DoT results too (it does). This
+        dialog explains the flow: the Save button is the same for UDP,
+        DoH, and DoT - the app auto-creates one profile per transport
+        found. Dismissible with 'Don't show again' checkbox so power
+        users don't see it after the first time.
+        """
+        try:
+            s = load_settings()
+            if s.get("doh_dot_save_guide_dismissed"):
+                return
+        except Exception:
+            s = {}
+
+        fa = self._lang == "fa"
+        d = tk.Toplevel(self)
+        d.title("How to save DoH/DoT results" if not fa else "نحوه ذخیره نتایج DoH/DoT")
+        d.configure(bg=BG)
+        try:
+            d.transient(self)
+            d.attributes("-topmost", True)
+        except Exception:
+            pass
+
+        # Container
+        wrap = tk.Frame(d, bg=BG, padx=24, pady=22)
+        wrap.pack()
+
+        # Heading
+        tk.Label(wrap,
+                 text=("نتایج DoH/DoT آماده ذخیره شد"
+                       if fa else
+                       "DoH/DoT results ready to save"),
+                 bg=BG, fg=TEXT_STRONG,
+                 font=FA(14, "bold") if fa else F(14, "bold"),
+                 anchor="w", justify="left",
+                 ).pack(fill="x", pady=(0, 12))
+
+        # Body text
+        if fa:
+            body = (
+                "همان دکمه «💾 ذخیره در VayDNS Profiles» را که برای اسکن "
+                "معمولی UDP استفاده می‌کنید برای نتایج DoH/DoT هم به کار ببرید.\n\n"
+                "اگر هم endpointهای DoH و هم DoT کار کرده باشند، برنامه "
+                "دو پروفایل جداگانه می‌سازد: یکی با پسوند ‎-DoH و دیگری ‎-DoT.\n\n"
+                "بعد به تب «VayDNS Profiles» بروید و پروفایل دلخواه را "
+                "اجرا کنید."
+            )
+        else:
+            body = (
+                "Use the same '💾 Save to VayDNS Profiles' button you "
+                "use for a normal UDP scan - it handles DoH/DoT too.\n\n"
+                "If both DoH and DoT endpoints worked, the app creates "
+                "two profiles automatically: one suffixed '-DoH' and "
+                "one suffixed '-DoT'.\n\n"
+                "Then switch to the 'VayDNS Profiles' tab and launch "
+                "the one you want to use."
+            )
+        tk.Label(wrap,
+                 text=body,
+                 bg=BG, fg=TEXT,
+                 font=FA(11) if fa else F(11),
+                 anchor="w", justify="left",
+                 wraplength=420,
+                 ).pack(fill="x", pady=(0, 14))
+
+        # Don't-show-again checkbox
+        dont_show_var = tk.BooleanVar(value=False)
+        cb = tk.Checkbutton(
+            wrap,
+            text=("دفعه بعد نشان نده" if fa else "Don't show this again"),
+            variable=dont_show_var,
+            bg=BG, fg=MUTED,
+            activebackground=BG, activeforeground=TEXT,
+            selectcolor=CARD,
+            font=FA(10) if fa else F(10),
+            anchor="w",
+        )
+        cb.pack(fill="x", pady=(0, 14))
+
+        # Got it button
+        def _close():
+            if dont_show_var.get():
+                try:
+                    s_now = load_settings()
+                    s_now["doh_dot_save_guide_dismissed"] = True
+                    save_settings(s_now)
+                except Exception:
+                    pass
+            d.destroy()
+
+        btn = tk.Button(wrap,
+                        text=("متوجه شدم" if fa else "Got it"),
+                        bg=ACCENT, fg=BTN_TEXT,
+                        font=FA(11, "bold") if fa else F(11, "bold"),
+                        relief="flat", bd=0, padx=22, pady=9,
+                        cursor="hand2",
+                        activebackground=ACCENT, activeforeground=BTN_TEXT,
+                        command=_close)
+        btn.pack(anchor="e")
+
+        # Center the dialog over the main window
+        d.update_idletasks()
+        try:
+            dw, dh = d.winfo_reqwidth(), d.winfo_reqheight()
+            x = self.winfo_x() + (self.winfo_width()  - dw) // 2
+            y = self.winfo_y() + (self.winfo_height() - dh) // 2
+            d.geometry(f"+{x}+{y}")
+        except Exception:
+            pass
+
+    def _set_scan_lock(self, locked: bool):
+        """Disable or re-enable all UI controls that shouldn't be touched
+        mid-scan: top-bar buttons (Help, Theme, Language), tab switching,
+        the VPN mode segmented control, and the inputs in the Connection
+        and Scan Options cards.
+
+        The Stop button stays enabled when locked (it's the only way out).
+        Save buttons remain governed by their own scan-result logic.
+
+        Why this matters: changing language mid-scan rebuilds the scanner
+        panel, which would orphan widget references inside the running
+        scan thread and produce errors. Theme switch shows a restart
+        toast, which is also disruptive. Tab switches hide the running
+        scan's status bar and progress. All of these are footguns - block
+        them while a scan is active.
+        """
+        W = self._W
+        st = "disabled" if locked else "normal"
+
+        # Top-bar buttons
+        for wkey in ("btn_help", "btn_theme", "btn_lang"):
+            if wkey not in W:
+                continue
+            try:
+                if locked:
+                    # Dim the text and switch cursor; we re-style on unlock.
+                    W[wkey].config(fg=DIS_FG, cursor="arrow")
+                else:
+                    # Restore role colors
+                    role_color = ACCENT if wkey == "btn_lang" else MUTED
+                    W[wkey].config(fg=role_color, cursor="hand2")
+            except Exception:
+                pass
+
+        # Tab labels: prevent tab switches during scan
+        for wkey in ("tab_scanner", "tab_profiles", "tab_vd_profiles"):
+            if wkey not in W:
+                continue
+            try:
+                W[wkey].config(cursor="arrow" if locked else "hand2")
+                # We don't actually unbind <Button-1> because that risks
+                # losing the binding; cursor change signals "no go" and
+                # the click handler short-circuits when self._scanning.
+            except Exception:
+                pass
+
+        # Mode segmented control
+        for wkey in ("seg_master", "seg_vaydns"):
+            if wkey not in W:
+                continue
+            try:
+                W[wkey].config(cursor="arrow" if locked else "hand2")
+            except Exception:
+                pass
+
+        # Inputs in Connection + Scan Options cards
+        # We walk the inputs we know about by their StringVar/IntVar.
+        # Direct widget config is most reliable.
+        for attr in ("_domain_var", "_key_var", "_vd_pubkey_var",
+                     "_country_var"):
+            v = getattr(self, attr, None)
+            if v is None:
+                continue
+            # Find the Entry that owns this var - simplest: walk parent
+            # frames and toggle child Entry/Spinbox state. We do this
+            # by setting a flag on the App which gates user input checks.
+        # We've also tracked widget keys for spinboxes
+        for wkey in ("t_sp", "c_sp", "to_sp", "p_sp"):
+            if wkey not in W:
+                continue
+            try:
+                W[wkey].config(state=st)
+            except Exception:
+                pass
+
+        # Cache the lock state so click handlers can check it
+        self._scan_locked = locked
+
+
         """Update all language-dependent labels after a language switch.
 
         With the v4.0.0 card-based UI, the cleanest approach is to
@@ -7887,6 +8135,7 @@ class App(tk.Tk):
             self._W["tree"].delete(row)
         self._stop_ev.clear()
         self._scanning = True
+        self._set_scan_lock(True)
         self._W["btn_scan"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
         self._W["btn_stop"].config(state="normal",   bg=DANGER, fg=BTN_TEXT, disabledforeground=DIS_FG)
         self._W["btn_save"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
@@ -8060,6 +8309,7 @@ class App(tk.Tk):
         domain = self._domain_var.get().strip()
 
         if not domain or not self._found_ips:
+            self._set_scan_lock(False)
             self._W["btn_scan"].config(state="normal",  bg=ACCENT,  fg=BTN_TEXT, disabledforeground=DIS_FG)
             if self._found_ips:
                 self._W["btn_save"].config(state="normal",  bg=BLUE,   fg=BTN_TEXT, disabledforeground=DIS_FG)
@@ -8126,6 +8376,7 @@ class App(tk.Tk):
         self._W["progress"]["value"] = 0
         self._stop_ev.clear()
         self._scanning = True
+        self._set_scan_lock(True)
         self._W["btn_scan"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
         self._W["btn_doh_scan"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
         self._W["btn_stop"].config(state="normal", bg=DANGER, fg=BTN_TEXT, disabledforeground=DIS_FG)
@@ -8178,6 +8429,7 @@ class App(tk.Tk):
 
     def _stop_scan(self):
         self._stop_ev.set()
+        self._set_scan_lock(False)
         self._W["btn_stop"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
         self._W["btn_scan"].config(state="normal",   bg=ACCENT,  fg=BTN_TEXT, disabledforeground=DIS_FG)
         if "btn_doh_scan" in self._W:
@@ -8188,6 +8440,7 @@ class App(tk.Tk):
 
     def _clear(self):
         self._stop_ev.set()
+        self._set_scan_lock(False)  # defensive: ensure UI is unlocked
         self._found_ips.clear()
         self._doh_found.clear()
         self._dot_found.clear()

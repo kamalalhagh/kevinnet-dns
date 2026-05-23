@@ -25,31 +25,75 @@ Two VPN engines are supported:
 
 ---
 
-## What's New in 3.3.0
+## Available Versions
 
-- 🔒  **DoH / DoT scanning** - new button scans a curated list of well-known DNS-over-HTTPS (port 443) and DNS-over-TLS (port 853) endpoints. Because the traffic is TLS, it's much harder for Iranian DPI to fingerprint as tunnel traffic than plain UDP/53.
-- 🖱  **Right-click context menu** on the resolver list - Copy IP, Copy all IPs, Open output folder.
-- ⏱  **Last-launched indicator** on each profile (`launched 5m ago`, `launched 3h ago`). Easy to spot which profile is currently active.
-- 💾  **Remembers your last inputs** - domain, country folder, and VPN mode are restored on next launch.
-- ✅  **Input validation** with clear error messages - no more confusing "parse TOML failed" errors when a paste contained a stray character.
-- 🔐  **Security hardening** - profile files are created with restrictive permissions on Linux/macOS so other users can't read your encryption keys.
-- 🧪  **Test suite** with 87 tests runs in CI before every release build.
-- 📜  **SHA-256 checksums** published alongside every release so you can verify downloads.
+KevinNet ships two public releases. Pick the one that fits your situation:
 
-See [CHANGELOG.md](CHANGELOG.md) for the full list.
+### 🟢 v4.1.1 — Recommended
+
+The current release. This is what you should download unless you have
+a specific reason not to. It does everything 3.2.2 does plus:
+
+- New **light and dark themes** with a one-click toggle and automatic
+  OS detection
+- New **Scan DoH/DoT button** that probes encrypted DNS endpoints
+  (much harder for Iranian DPI to fingerprint than plain UDP/53)
+- DoH/DoT scan results save directly into VayDNS profiles using the
+  same Save button you already know
+- Redesigned interface with card-based layout, brand mark, modern
+  status bar, and underlined active tab
+- Right-click context menu on the resolver list (Copy IP, Copy all,
+  Open output folder)
+- Last-launched indicator on each profile (`launched 5m ago`, etc.)
+- App remembers your last domain, output folder, and VPN mode
+  between launches
+- Input validators with clear error messages for bad domains, keys,
+  and folder names
+- Profile JSONs and config files created with 0600 permissions on
+  Linux/macOS so other users can't read your encryption keys
+- New themed HTML help page opens in your browser
+- Buttons disabled during scans to prevent accidental disruption
+- SHA-256 checksums published alongside every release for download
+  verification
+- 92-test pytest suite runs in CI before any binary ships
+
+See [CHANGELOG.md](CHANGELOG.md) for the full list of changes.
+
+### 🟡 v3.2.2 — Legacy
+
+The previous stable release. Still works, still available on the
+Releases page. Use this only if:
+
+- You have a working setup on 3.2.2 and don't want to change anything
+- You've reported a 4.1.1 regression specific to your environment
+  and it hasn't been fixed yet
+
+For everyone else, use **v4.1.1**. Profile files are compatible
+between the two versions, so you can switch back and forth without
+losing your data.
 
 ---
 
 ## 📥 Download KevinNet
 
-Download the latest release from the [**Releases page**](../../releases/latest):
+Go to the [**Releases page**](../../releases) and pick one of the two
+versions:
+
+### v4.1.1 (recommended)
 
 | Platform | File |
 |---|---|
 | 🪟 Windows x64 | `KevinNet_Windows_x64.exe` |
+| 🪟 Windows ARM64 | `KevinNet_Windows_ARM64.exe` |
 | 🍎 macOS (Intel + Apple Silicon) | `KevinNet_macOS_Universal` |
 | 🐧 Linux x64 | `KevinNet_Linux_x64` |
 | 🐧 Linux ARM64 | `KevinNet_Linux_ARM64` |
+
+### v3.2.2 (legacy)
+
+Same platform binaries are available on the v3.2.2 release page. Only
+download these if 4.1.1 doesn't work for you — see [CHANGELOG.md](CHANGELOG.md)
+for the comparison.
 
 > **macOS:** After downloading, run in Terminal:
 > ```bash

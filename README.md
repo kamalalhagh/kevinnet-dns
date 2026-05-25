@@ -29,7 +29,7 @@ Two VPN engines are supported:
 
 KevinNet ships two public releases. Pick the one that fits your situation:
 
-### 🟢 v4.1.2 — Recommended
+### 🟢 v4.1.4 — Recommended
 
 The current release. This is what you should download unless you have
 a specific reason not to. It does everything 3.2.2 does plus:
@@ -65,10 +65,10 @@ The previous stable release. Still works, still available on the
 Releases page. Use this only if:
 
 - You have a working setup on 3.2.2 and don't want to change anything
-- You've reported a 4.1.2 regression specific to your environment
+- You've reported a 4.1.4 regression specific to your environment
   and it hasn't been fixed yet
 
-For everyone else, use **v4.1.2**. Profile files are compatible
+For everyone else, use **v4.1.4**. Profile files are compatible
 between the two versions, so you can switch back and forth without
 losing your data.
 
@@ -79,7 +79,7 @@ losing your data.
 Go to the [**Releases page**](../../releases) and pick one of the two
 versions:
 
-### v4.1.2 (recommended)
+### v4.1.4 (recommended)
 
 | Platform | File |
 |---|---|
@@ -92,7 +92,7 @@ versions:
 ### v3.2.2 (legacy)
 
 Same platform binaries are available on the v3.2.2 release page. Only
-download these if 4.1.2 doesn't work for you — see [CHANGELOG.md](CHANGELOG.md)
+download these if 4.1.4 doesn't work for you — see [CHANGELOG.md](CHANGELOG.md)
 for the comparison.
 
 > **macOS:** After downloading, run in Terminal:

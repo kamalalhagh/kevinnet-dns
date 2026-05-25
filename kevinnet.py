@@ -8,7 +8,7 @@ import asyncio, os, queue, random, sys, threading, time
 from datetime import datetime
 from pathlib import Path
 
-__version__ = "4.1.2"
+__version__ = "4.1.4"
 
 # ── Embedded app icon (base64 PNG, 256x256) ────────────────────
 ICON_B64 = (
@@ -5589,9 +5589,9 @@ class App(tk.Tk):
                                                      cursor="hand2", disabledforeground=DIS_FG)
                     n = len(verified)
                     self._W["badge"].config(
-                        text=f"{n}  {'تأیید E2E' if fa else 'E2E verified'}")
+                        text=_bidi(f"{n}  {'تأیید E2E' if fa else 'E2E verified'}"))
                     self._W["status_lbl"].config(
-                        text=f"● {'کامل' if fa else 'Done'}  -  {n} {'تأیید شده' if fa else 'E2E verified'}",
+                        text=_bidi(f"● {'کامل' if fa else 'Done'}  -  {n} {'تأیید شده' if fa else 'E2E verified'}"),
                         fg=GREEN)
                     self._log(
                         f"{'✓ مرحله ۳ کامل:' if fa else '✓ Phase 3 done:'} "
@@ -5637,8 +5637,8 @@ class App(tk.Tk):
                             state="normal", bg=PURPLE, fg=BTN_TEXT,
                             disabledforeground=DIS_FG)
                     self._W["status_lbl"].config(
-                        text=f"● {'DoH/DoT کامل' if fa else 'DoH/DoT done'}"
-                             f"  -  {found}/{tested} reachable",
+                        text=_bidi(f"● {'DoH/DoT کامل' if fa else 'DoH/DoT done'}"
+                                   f"  -  {found}/{tested} reachable"),
                         fg=GREEN)
                     self._log(
                         f"{'✓ DoH/DoT کامل:' if fa else '✓ DoH/DoT done:'} "
@@ -5795,7 +5795,8 @@ class App(tk.Tk):
         self._tab_underlines = {}
 
         def make_tab(wkey, en_text, fa_text, cmd):
-            text = fa_text if self._lang == "fa" else en_text
+            fa = self._lang == "fa"
+            text = _bidi(fa_text) if fa else en_text
             # Wrap each tab in a Frame so we can put a 2px underline at
             # the bottom (positioned absolutely so it doesn't shift the
             # label when toggling active state).
@@ -5803,7 +5804,7 @@ class App(tk.Tk):
             wrap.pack(side="left", padx=4, pady=0)
             lbl = tk.Label(wrap, text=text,
                            bg=BG_ELEVATED, fg=MUTED,
-                           font=F(12, "bold"),
+                           font=FA(12, "bold") if fa else F(12, "bold"),
                            padx=18, pady=14, cursor="hand2")
             lbl.pack(side="top")
             underline = tk.Frame(wrap, bg=BG_ELEVATED, height=2)
@@ -5987,7 +5988,7 @@ class App(tk.Tk):
         list_hdr = tk.Frame(list_frame, bg=CARD)
         list_hdr.pack(fill="x", padx=14, pady=(12, 10))
         tk.Label(list_hdr,
-                 text="پروفایل‌ها" if fa else "Profiles",
+                 text=_bidi("پروفایل‌ها" if fa else "Profiles"),
                  bg=CARD, fg=TEXT_STRONG,
                  font=FA(13, "bold") if fa else F(13, "bold"),
                  ).pack(side="left")
@@ -6016,7 +6017,7 @@ class App(tk.Tk):
 
         W["pdetail_empty"] = tk.Label(
             detail_outer,
-            text="یک پروفایل انتخاب کنید" if fa else "Select a profile to view or edit",
+            text=_bidi("یک پروفایل انتخاب کنید" if fa else "Select a profile to view or edit"),
             bg=BG, fg=MUTED, font=F(12))
         W["pdetail_empty"].pack(expand=True)
 
@@ -6055,7 +6056,7 @@ class App(tk.Tk):
 
         meta = card(detail, "⚙  Profile Info", "⚙  اطلاعات پروفایل")
 
-        tk.Label(meta, text="نام پروفایل" if fa else "Profile Name",
+        tk.Label(meta, text=_bidi("نام پروفایل" if fa else "Profile Name"),
                  bg=CARD, fg=MUTED, font=F(9), anchor="w").pack(fill="x")
         self._pname_var = tk.StringVar()
         tk.Entry(meta, textvariable=self._pname_var,
@@ -6167,8 +6168,9 @@ class App(tk.Tk):
 
         if not self._profiles:
             tk.Label(inner,
-                     text="هنوز پروفایلی وجود ندارد\nابتدا اسکن انجام دهید" if fa
-                          else "No profiles yet.\nRun a scan first.",
+                     text=_bidi("هنوز پروفایلی وجود ندارد\nابتدا اسکن انجام دهید"
+                                if fa else
+                                "No profiles yet.\nRun a scan first."),
                      bg=CARD, fg=MUTED,
                      font=FA(9) if fa else F(9),
                      justify="center", padx=12, pady=20).pack()
@@ -6480,7 +6482,7 @@ class App(tk.Tk):
         list_hdr = tk.Frame(list_frame, bg=CARD)
         list_hdr.pack(fill="x", padx=14, pady=(12, 10))
         tk.Label(list_hdr,
-                 text="پروفایل‌های VayDNS" if fa else "VayDNS Profiles",
+                 text=_bidi("پروفایل‌های VayDNS" if fa else "VayDNS Profiles"),
                  bg=CARD, fg=TEXT_STRONG,
                  font=FA(13, "bold") if fa else F(13, "bold"),
                  ).pack(side="left")
@@ -6504,8 +6506,9 @@ class App(tk.Tk):
 
         W["vd_pdetail_empty"] = tk.Label(
             det_outer,
-            text="یک پروفایل VayDNS انتخاب کنید" if fa
-                 else "Select a VayDNS profile to view or edit",
+            text=_bidi("یک پروفایل VayDNS انتخاب کنید"
+                       if fa else
+                       "Select a VayDNS profile to view or edit"),
             bg=BG, fg=MUTED, font=F(12))
         W["vd_pdetail_empty"].pack(expand=True)
 
@@ -6538,7 +6541,7 @@ class App(tk.Tk):
 
         # Card: info
         meta = card(detail, "⚙  Profile Info", "⚙  اطلاعات پروفایل")
-        tk.Label(meta, text="نام پروفایل" if fa else "Profile Name",
+        tk.Label(meta, text=_bidi("نام پروفایل" if fa else "Profile Name"),
                  bg=CARD, fg=MUTED, font=F(9), anchor="w").pack(fill="x")
         self._vd_pname_var = tk.StringVar()
         tk.Entry(meta, textvariable=self._vd_pname_var,
@@ -6606,7 +6609,7 @@ class App(tk.Tk):
         hint_row = tk.Frame(opt, bg=CARD)
         hint_row.pack(fill="x", pady=(0, 4))
         tk.Label(hint_row,
-                 text="↑ خالی = همه IP‌ها  |  IP وارد کنید = فقط آن یک Resolver  |  DoH: URL کامل  |  DoT: host:853" if fa else "↑ Empty = try all scanned IPs in order  |  Enter IP = use only that one  |  DoH: full URL  |  DoT: host:853",
+                 text=_bidi("↑ خالی = همه IP‌ها  |  IP وارد کنید = فقط آن یک Resolver  |  DoH: URL کامل  |  DoT: host:853" if fa else "↑ Empty = try all scanned IPs in order  |  Enter IP = use only that one  |  DoH: full URL  |  DoT: host:853"),
                  bg=CARD, fg=MUTED,
                  font=FA(8) if fa else F(8),
                  anchor="w", justify="left",
@@ -6703,8 +6706,9 @@ class App(tk.Tk):
 
         if not self._vd_profiles:
             tk.Label(inner,
-                     text="هنوز پروفایل VayDNS ندارید\nابتدا اسکن انجام دهید" if fa
-                          else "No VayDNS profiles yet.\nRun a scan first.",
+                     text=_bidi("هنوز پروفایل VayDNS ندارید\nابتدا اسکن انجام دهید"
+                                if fa else
+                                "No VayDNS profiles yet.\nRun a scan first."),
                      bg=CARD, fg=MUTED, font=FA(9) if fa else F(9),
                      justify="center", padx=12, pady=20).pack()
             self._vd_sel_profile = None
@@ -7088,7 +7092,7 @@ class App(tk.Tk):
             # Mode hint
             if "mode_hint" in W:
                 W["mode_hint"].config(
-                    text=("اسکن resolverهای UDP/53 ایرانی برای MasterDNS VPN"
+                    text=(_bidi("اسکن resolverهای UDP/53 ایرانی برای MasterDNS VPN")
                           if fa else
                           "Scans Iranian UDP/53 resolvers for the MasterDNS multi-resolver VPN."))
         else:  # vaydns
@@ -7113,7 +7117,7 @@ class App(tk.Tk):
 
             if "mode_hint" in W:
                 W["mode_hint"].config(
-                    text=("Start Scan = UDP/53  |  Scan DoH/DoT = endpointهای رمزنگاری شده"
+                    text=(_bidi("Start Scan = UDP/53  |  Scan DoH/DoT = endpointهای رمزنگاری شده")
                           if fa else
                           "Start Scan = UDP/53 resolvers  |  Scan DoH/DoT = encrypted endpoints"))
 
@@ -7214,7 +7218,7 @@ class App(tk.Tk):
             bar.pack_propagate(False)
 
             tk.Label(header,
-                     text=(title_fa if fa else title_en).upper(),
+                     text=(_bidi(title_fa) if fa else title_en.upper()),
                      bg=CARD, fg=MUTED,
                      font=FA(10, "bold") if fa else F(10, "bold"),
                      ).pack(side="left")
@@ -7236,7 +7240,7 @@ class App(tk.Tk):
             wrap.pack(fill="x", pady=(0, 12))
 
             tk.Label(wrap,
-                     text=(label_fa if fa else label_en).upper(),
+                     text=(_bidi(label_fa) if fa else label_en.upper()),
                      bg=CARD, fg=MUTED,
                      font=FA(9, "bold") if fa else F(9, "bold"),
                      anchor="w"
@@ -7260,7 +7264,7 @@ class App(tk.Tk):
 
             if hint_en or hint_fa:
                 tk.Label(wrap,
-                         text=hint_fa if fa else hint_en,
+                         text=(_bidi(hint_fa) if fa else hint_en),
                          bg=CARD, fg=HINT,
                          font=FA(9) if fa else F(9),
                          anchor="w", justify="left",
@@ -7287,7 +7291,7 @@ class App(tk.Tk):
             """Half of the segmented control. The active half gets a
             colored bg + bold text; inactive halves stay muted."""
             seg = tk.Label(seg_outer,
-                           text=fa_t if fa else en,
+                           text=_bidi(fa_t) if fa else en,
                            bg=INPUT, fg=MUTED,
                            font=F(11, "bold"),
                            padx=12, pady=10,
@@ -7390,7 +7394,7 @@ class App(tk.Tk):
                       padx=(0, 8) if col == 0 else (0, 0),
                       pady=(0, 10))
             tk.Label(cell,
-                     text=(fa_t if fa else en).upper(),
+                     text=(_bidi(fa_t) if fa else en.upper()),
                      bg=CARD, fg=MUTED,
                      font=FA(9, "bold") if fa else F(9, "bold"),
                      anchor="w"
@@ -7424,7 +7428,7 @@ class App(tk.Tk):
             wrap = tk.Frame(body4, bg=CARD)
             wrap.pack(fill="x", pady=(0, 8))
             b = tk.Button(wrap,
-                          text=fa_t if fa else en,
+                          text=_bidi(fa_t) if fa else en,
                           bg=color, fg=BTN_TEXT,
                           font=FA(11, "bold") if fa else F(11, "bold"),
                           relief="flat", bd=0,
@@ -7447,7 +7451,7 @@ class App(tk.Tk):
             fg = {"vaydns": PURPLE, "danger": DANGER}.get(role, TEXT) if state == "normal" else DIS_FG
             border_bg = {"vaydns": PURPLE, "danger": DANGER}.get(role, BORDER_BOLD)
             b = tk.Button(wrap,
-                          text=fa_t if fa else en,
+                          text=_bidi(fa_t) if fa else en,
                           bg=CARD_HOVER,
                           fg=fg,
                           font=FA(11, "bold") if fa else F(11, "bold"),
@@ -7483,7 +7487,7 @@ class App(tk.Tk):
         def save_btn(wkey, en, fa_t, command, role):
             color = {"master": BLUE, "vaydns": PURPLE}.get(role, ACCENT)
             b = tk.Button(self._save_btn_frame,
-                          text=fa_t if fa else en,
+                          text=_bidi(fa_t) if fa else en,
                           bg=DIS_BG, fg=DIS_FG,
                           font=FA(11, "bold") if fa else F(11, "bold"),
                           relief="flat", bd=0,
@@ -7543,17 +7547,18 @@ class App(tk.Tk):
         W["status_pulse"] = tk.Label(status_left, text="●", bg=CARD,
                                       fg=GREEN, font=F(13, "bold"))
         W["status_pulse"].pack(side="left", padx=(0, 8))
+        fa_lang = self._lang == "fa"
         W["status_lbl"] = tk.Label(status_left,
-                                    text=("آماده" if self._lang == "fa" else "Ready"),
+                                    text=(_bidi("آماده") if fa_lang else "Ready"),
                                     bg=CARD, fg=TEXT,
-                                    font=F(11, "bold"))
+                                    font=FA(11, "bold") if fa_lang else F(11, "bold"))
         W["status_lbl"].pack(side="left")
 
         # Right: count badge
         W["badge"] = tk.Label(status_inner,
-                               text=("0 یافت شد" if self._lang == "fa" else "0 found"),
+                               text=(_bidi("0 یافت شد") if fa_lang else "0 found"),
                                bg=ACCENT_SOFT, fg=ACCENT,
-                               font=F(10, "bold"),
+                               font=FA(10, "bold") if fa_lang else F(10, "bold"),
                                padx=12, pady=4)
         W["badge"].pack(side="right")
 
@@ -7588,10 +7593,11 @@ class App(tk.Tk):
         res_bar.pack(side="left", padx=(0, 10))
         res_bar.pack_propagate(False)
 
+        fa_lang2 = self._lang == "fa"
         W["res_hdr"] = tk.Label(res_hdr_fr,
-                                 text=("نتایج" if self._lang == "fa" else "RESULTS"),
+                                 text=(_bidi("نتایج") if fa_lang2 else "RESULTS"),
                                  bg=CARD, fg=MUTED,
-                                 font=F(10, "bold"))
+                                 font=FA(10, "bold") if fa_lang2 else F(10, "bold"))
         W["res_hdr"].pack(side="left")
 
         W["res_count"] = tk.Label(res_hdr_fr, text="",
@@ -7676,10 +7682,11 @@ class App(tk.Tk):
         log_bar.pack(side="left", padx=(0, 10))
         log_bar.pack_propagate(False)
 
+        fa_lang3 = self._lang == "fa"
         tk.Label(log_hdr_fr,
-                 text=("فعالیت" if self._lang == "fa" else "ACTIVITY"),
+                 text=(_bidi("فعالیت") if fa_lang3 else "ACTIVITY"),
                  bg=CARD, fg=MUTED,
-                 font=F(10, "bold")
+                 font=FA(10, "bold") if fa_lang3 else F(10, "bold")
                  ).pack(side="left")
 
         tk.Frame(log_card, bg=BORDER, height=1).pack(fill="x", padx=14)
@@ -7740,9 +7747,9 @@ class App(tk.Tk):
             pass
         # Show a small toast at the bottom of the window
         self._show_toast(
-            text=("تم تغییر کرد. برای اعمال، برنامه را دوباره باز کنید."
-                  if self._lang == "fa" else
-                  f"Switched to {new_name} theme. Restart KevinNet to apply."),
+            text=_bidi("تم تغییر کرد. برای اعمال، برنامه را دوباره باز کنید."
+                       if self._lang == "fa" else
+                       f"Switched to {new_name} theme. Restart KevinNet to apply."),
             duration_ms=4500,
         )
 
@@ -7812,7 +7819,7 @@ class App(tk.Tk):
 
         # Heading
         tk.Label(wrap,
-                 text=("نتایج DoH/DoT آماده ذخیره شد"
+                 text=_bidi(("نتایج DoH/DoT آماده ذخیره شد")
                        if fa else
                        "DoH/DoT results ready to save"),
                  bg=BG, fg=TEXT_STRONG,
@@ -7852,7 +7859,7 @@ class App(tk.Tk):
         dont_show_var = tk.BooleanVar(value=False)
         cb = tk.Checkbutton(
             wrap,
-            text=("دفعه بعد نشان نده" if fa else "Don't show this again"),
+            text=_bidi(("دفعه بعد نشان نده" if fa else "Don't show this again")),
             variable=dont_show_var,
             bg=BG, fg=MUTED,
             activebackground=BG, activeforeground=TEXT,
@@ -7874,7 +7881,7 @@ class App(tk.Tk):
             d.destroy()
 
         btn = tk.Button(wrap,
-                        text=("متوجه شدم" if fa else "Got it"),
+                        text=_bidi(("متوجه شدم" if fa else "Got it")),
                         bg=ACCENT, fg=BTN_TEXT,
                         font=FA(11, "bold") if fa else F(11, "bold"),
                         relief="flat", bd=0, padx=22, pady=9,
@@ -7987,13 +7994,17 @@ class App(tk.Tk):
 
         # ── Top-bar buttons: easy, single widgets ──
         try:
-            W["btn_lang"].config(text="English" if fa else "فارسی",
+            # When current lang is fa, toggle text shows "English" - which is
+            # English, no bidi needed. When current lang is en, toggle shows
+            # "فارسی" - which IS Persian and needs bidi on Windows.
+            lang_btn_text = "English" if fa else _bidi("فارسی")
+            W["btn_lang"].config(text=lang_btn_text,
                                   fg=ACCENT,
                                   font=FA(11, "bold") if fa else F(11, "bold"))
         except Exception:
             pass
         try:
-            W["btn_help"].config(text="؟" if fa else "?",
+            W["btn_help"].config(text=_bidi("؟" if fa else "?"),
                                   font=FA(12, "bold") if fa else F(12, "bold"))
         except Exception:
             pass
@@ -8006,7 +8017,7 @@ class App(tk.Tk):
         ]:
             if wkey in W:
                 try:
-                    W[wkey].config(text=fa_t if fa else en,
+                    W[wkey].config(text=_bidi(fa_t) if fa else en,
                                     font=FA(12, "bold") if fa else F(12, "bold"))
                 except Exception:
                     pass
@@ -8027,10 +8038,37 @@ class App(tk.Tk):
                 "timeout": self._timeout_var.get(),
                 "pool":    self._pool_var.get(),
             }
+
+            # Also preserve tree contents (resolver list shown to user)
+            # and log contents. Without this, switching language after
+            # a successful scan wipes the visible results - confusing
+            # because _found_ips still has the data but the UI shows
+            # nothing.
+            saved_rows = []
+            try:
+                tree = self._W.get("tree")
+                if tree is not None:
+                    for row in tree.get_children():
+                        vals = tree.item(row, "values")
+                        tags = tree.item(row, "tags") or ()
+                        if vals:
+                            saved_rows.append((tuple(vals), tuple(tags)))
+            except Exception:
+                pass
+
+            saved_log = ""
+            try:
+                log = self._W.get("log")
+                if log is not None:
+                    saved_log = log.get("1.0", "end-1c")
+            except Exception:
+                pass
+
             # Destroy and rebuild left panel
             for child in self._scanner_view.winfo_children():
                 child.destroy()
             self._rebuild_scanner_view()
+
             # Restore values
             self._domain_var.set(saved["domain"])
             self._key_var.set(saved["key"])
@@ -8040,8 +8078,58 @@ class App(tk.Tk):
             self._conc_var.set(saved["conc"])
             self._timeout_var.set(saved["timeout"])
             self._pool_var.set(saved["pool"])
+
             # Re-apply mode reshape with restored selection
             self._set_vpn_mode(saved["mode"])
+
+            # Restore tree contents - the new Treeview from _rebuild was
+            # empty. Re-insert each row with its original values + tags
+            # so the user keeps seeing their scan results.
+            try:
+                tree = self._W.get("tree")
+                if tree is not None and saved_rows:
+                    for vals, tags in saved_rows:
+                        tree.insert("", "end", values=vals, tags=tags)
+                    # Re-apply tag colors (foreground for e2e/doh/dot rows)
+                    tree.tag_configure("e2e", foreground="#a78bfa")
+                    tree.tag_configure("doh", foreground="#5eead4")
+                    tree.tag_configure("dot", foreground="#a5b4fc")
+            except Exception:
+                pass
+
+            # Restore log contents
+            try:
+                log = self._W.get("log")
+                if log is not None and saved_log:
+                    log.config(state="normal")
+                    log.insert("1.0", saved_log)
+                    log.see("end")
+                    log.config(state="disabled")
+            except Exception:
+                pass
+
+            # Update badge and save-button state based on what's still
+            # in memory. This keeps the post-scan summary visible after
+            # a language switch.
+            fa = self._lang == "fa"
+            try:
+                n = len(self._found_ips)
+                if n > 0:
+                    self._W["badge"].config(
+                        text=_bidi(f"{n}  {'یافت‌شده' if fa else 'found'}"))
+                    if saved["mode"] == "masterdns":
+                        self._W["btn_save"].config(
+                            state="normal", bg=BLUE, fg=BTN_TEXT,
+                            disabledforeground=DIS_FG)
+                    else:
+                        self._W["btn_vd_save"].config(
+                            state="normal", bg=PURPLE, fg=BTN_TEXT,
+                            disabledforeground=DIS_FG)
+                    self._W["btn_export"].config(
+                        state="normal", bg=WARN, fg=BTN_TEXT,
+                        cursor="hand2", disabledforeground=DIS_FG)
+            except Exception:
+                pass
         except Exception as e:
             # If anything goes wrong, log it; lang switch is non-critical
             try:
@@ -8278,7 +8366,7 @@ class App(tk.Tk):
         self._W["prog_lbl"].config(text=txt)
         n = len(self._found_ips)
         self._W["badge"].config(
-            text=f"{n}  {'یافت‌شده' if fa else 'found'}")
+            text=_bidi(f"{n}  {'یافت‌شده' if fa else 'found'}"))
 
     def _on_result(self, ip, score, max_score, ms, detail_str):
         fa = self._lang == "fa"
@@ -8286,7 +8374,7 @@ class App(tk.Tk):
         n = len(self._found_ips)
         if "res_count" in self._W:
             self._W["res_count"].config(
-                text=f"{n} {'یافت‌شده' if fa else 'found'}")
+                text=_bidi(f"{n} {'یافت‌شده' if fa else 'found'}"))
         # Color by score - all shown, sorted visually
         if score == 6:
             tag, icon = "s6", ""   # bright green  - perfect
@@ -8309,7 +8397,7 @@ class App(tk.Tk):
         self._log(f"{icon}  {ip}   {score}/{max_score}   {ms:.0f}ms   {detail_str}")
         n = len(self._found_ips)
         self._W["badge"].config(
-            text=f"{n}  {'یافت‌شده' if fa else 'found'}")
+            text=_bidi(f"{n}  {'یافت‌شده' if fa else 'found'}"))
 
     def _on_done(self, tested, found):
         fa = self._lang == "fa"
@@ -8322,7 +8410,7 @@ class App(tk.Tk):
         if found and not self._stop_ev.is_set():
             # Auto-start Phase 3 E2E immediately
             self._W["status_lbl"].config(
-                text=f"● {'مرحله ۳: تأیید واقعی تانل…' if fa else 'Phase 3: E2E tunnel verify…'}",
+                text=_bidi(f"● {'مرحله ۳: تأیید واقعی تانل…' if fa else 'Phase 3: E2E tunnel verify…'}"),
                 fg="#a78bfa")
             self._log(
                 f"{'مرحله ۳ شروع شد - تأیید واقعی تانل با SlipNet…' if fa else 'Phase 3 started - real tunnel verify via SlipNet…'}")
@@ -8337,7 +8425,7 @@ class App(tk.Tk):
                 else:
                     self._W["btn_vd_save"].config(state="normal", bg=PURPLE, fg=BTN_TEXT, disabledforeground=DIS_FG)
             self._W["status_lbl"].config(
-                text=f"● {'اتمام' if fa else 'Done'}  -  {found} {'یافت‌شده' if fa else 'found'}",
+                text=_bidi(f"● {'اتمام' if fa else 'Done'}  -  {found} {'یافت‌شده' if fa else 'found'}"),
                 fg=GREEN)
 
     def _run_e2e_auto(self):
@@ -8490,7 +8578,7 @@ class App(tk.Tk):
         self._W["progress"]["value"] = 0
         self._W["prog_lbl"].config(text="Ready")
         fa = self._lang == "fa"
-        self._W["badge"].config(text=f"0  {'یافت‌شده' if fa else 'found'}")
+        self._W["badge"].config(text=_bidi(f"0  {'یافت‌شده' if fa else 'found'}"))
         self._W["status_lbl"].config(text="● Ready", fg=GREEN)
         self._W["btn_save"].config(state="disabled",    bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
         self._W["btn_vd_save"].config(state="disabled", bg=DIS_BG, fg=DIS_FG, disabledforeground=DIS_FG)
@@ -8812,7 +8900,7 @@ class App(tk.Tk):
             self._log(
                 f"{'MasterDNSVPN راه‌اندازی شد از:' if fa else 'MasterDNSVPN launched from:'} {folder}")
             self._W["status_lbl"].config(
-                text=f"● {'در حال اتصال…' if fa else 'Connecting…'}", fg=GREEN)
+                text=_bidi(f"● {'در حال اتصال…' if fa else 'Connecting…'}"), fg=GREEN)
 
         except Exception as e:
             err = "خطا در راه‌اندازی:" if fa else "Launch error:"
@@ -8866,7 +8954,7 @@ class App(tk.Tk):
 
         self._saved_folder = folder
         self._W["status_lbl"].config(
-            text=f"● {'ذخیره شد' if fa else 'Saved'}", fg=ACCENT)
+            text=_bidi(f"● {'ذخیره شد' if fa else 'Saved'}"), fg=ACCENT)
         self._log(f"Saved  →  {folder}")
         messagebox.showinfo(
             "Saved",

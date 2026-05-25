@@ -186,3 +186,48 @@ class TestModeSwitchPreservesResults:
         src = inspect.getsource(kn.App._clear)
         assert "_found_ips.clear()" in src, (
             "_clear must still reset scan results")
+
+
+class TestPersianTextUsesBidi:
+    """Regression test for the Windows-only Persian rendering bug
+    (4.1.0-4.1.2). The new card-based UI bypassed the existing
+    arabic_reshaper + python-bidi pipeline, causing Persian text to
+    appear as disconnected isolated letterforms on Windows.
+
+    Static check: every line in kevinnet.py that sets text=
+    containing a Persian/Arabic character must also wrap it in _bidi()
+    (or be a setting-via-StringVar, or be a docstring/comment).
+    """
+
+    def test_no_raw_persian_in_text_assignments(self):
+        from pathlib import Path
+        src_path = Path(__file__).parent.parent / "kevinnet.py"
+        src = src_path.read_text(encoding="utf-8")
+
+        offenders = []
+        for i, line in enumerate(src.split("\n"), 1):
+            # Skip docstrings, comments
+            stripped = line.strip()
+            if stripped.startswith("#") or stripped.startswith('"""'):
+                continue
+            # Skip data lines (dicts of translations, etc.)
+            # We only flag actual text= assignments to widgets
+            if "text=" not in line:
+                continue
+            # Must contain a Persian/Arabic character
+            if not any("\u0600" <= c <= "\u06ff" for c in line):
+                continue
+            # Must NOT already have _bidi - that's the fix
+            if "_bidi" in line:
+                continue
+            # Some lines reference text= in HELP dict definitions - those
+            # are content, not widget assignments. Filter those.
+            if "HELP[" in line or "HELP_" in line:
+                continue
+            offenders.append((i, line.strip()))
+
+        assert not offenders, (
+            f"Found {len(offenders)} widget text= assignments with raw "
+            f"Persian text but no _bidi() wrapper - Windows will render "
+            f"these incorrectly. First few:\n" +
+            "\n".join(f"  L{i}: {ln[:100]}" for i, ln in offenders[:5]))

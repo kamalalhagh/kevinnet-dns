@@ -5,14 +5,97 @@ All notable changes to **KevinNet DNS** are documented in this file.
 This project ships only two public releases:
 
 - **v3.2.2** — the original stable release. Still available, still works.
-- **v4.1.2** — the current release. Recommended for all users.
+- **v4.1.4** — the current release. Recommended for all users.
 
 There are no intermediate versions on GitHub. Older internal iterations
-(3.3.x, 3.4.x, 4.0.x, 4.1.0, 4.1.1) were superseded and are no longer
-published.
+(3.3.x, 3.4.x, 4.0.x, 4.1.0, 4.1.1, 4.1.2, 4.1.3) were superseded and
+are no longer published.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [4.1.4] — 2026-05-25
+
+A bug fix release on top of 4.1.3.
+
+### Fixed
+
+- **The Results table no longer clears when you switch language after
+  a scan.**
+
+  Previous behavior: after running a scan and getting verified
+  resolvers, clicking the language toggle (English ↔ فارسی) wiped
+  the Results table visually, even though the resolvers were still
+  in memory (Save and Export still worked, but the list was no
+  longer visible).
+
+  Root cause: the language refresh rebuilds the scanner panel from
+  scratch to make sure all card titles, button labels, and hint text
+  pick up the new language. The rebuild created a fresh Treeview
+  widget and didn't repopulate it from the existing scan results.
+
+  Fix: the language refresh now snapshots the current Treeview rows
+  (with their values and tag colors) and the activity log contents
+  before destroying the old widgets, then restores them into the new
+  ones after rebuild. The badge text and Save/Export button state are
+  also re-synced based on `_found_ips`, so the post-scan summary
+  stays visible across language toggles.
+
+### Affected users
+
+Anyone who ran a scan and then changed the interface language while
+results were still on screen. The data was never actually lost — Save
+to MasterDNS/VayDNS Profiles and Export DNS List continued to work —
+but the missing visual feedback was confusing.
+
+---
+
+## [4.1.3] — 2026-05-25
+
+A bug fix release on top of 4.1.2 that resolves the Windows-only
+Persian text rendering problem.
+
+### Fixed
+
+- **Persian/Arabic text now renders correctly on Windows.**
+
+  Previous behavior on Windows: Persian labels throughout the UI
+  (tab names like "اسکنر", card titles like "موتور VPN" and "اتصال",
+  button text like "شروع اسکن", status text "آماده", etc.) appeared
+  as disconnected isolated letterforms in reversed order. Letters
+  weren't joined and the visual order was wrong.
+
+  Root cause: the new card-based UI introduced in 4.1.0 wrote Persian
+  text directly to Tk widgets, bypassing the existing
+  `arabic_reshaper + python-bidi` pipeline. On macOS, the native
+  CoreText renderer shapes Arabic-script text correctly without help.
+  On Windows (GDI) and Linux (FreeType), Tk needs the text pre-shaped
+  into visual order. The old 3.2.2 code path used this pipeline
+  everywhere; the new UI helpers (`make_card`, `field`, `make_seg`,
+  `primary_btn`, `secondary_btn`, `save_btn`, tab labels, status bar,
+  RESULTS/ACTIVITY headers, mode hints, toasts, dialogs) all missed it.
+
+  Fixed by wrapping every Persian text site with `_bidi()`, which is
+  a no-op on macOS (CoreText handles shaping) and applies
+  `arabic_reshaper + python-bidi` on Windows and Linux. The fix
+  affects approximately 30 widget sites.
+
+- Also removed the stray `.upper()` calls on Persian labels (e.g.
+  "موتور VPN", "اتصال") — Persian has no uppercase form, and the
+  `.upper()` call could strip directional control marks. English
+  labels still get `.upper()` for the design's small-caps appearance.
+
+### Affected users
+
+Anyone running KevinNet on Windows with the app's default Persian
+interface. macOS users were unaffected.
+
+If you're on Windows with 4.1.0, 4.1.1, or 4.1.2 and the Persian text
+looks broken, upgrade to 4.1.3. As a workaround in older builds,
+switching the interface to English via the language toggle worked
+around the bug (English text isn't affected).
 
 ---
 

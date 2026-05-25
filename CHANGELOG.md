@@ -5,14 +5,43 @@ All notable changes to **KevinNet DNS** are documented in this file.
 This project ships only two public releases:
 
 - **v3.2.2** — the original stable release. Still available, still works.
-- **v4.1.1** — the current release. Recommended for all users.
+- **v4.1.2** — the current release. Recommended for all users.
 
 There are no intermediate versions on GitHub. Older internal iterations
-(3.3.x, 3.4.x, 4.0.x, 4.1.0) were superseded and are no longer
+(3.3.x, 3.4.x, 4.0.x, 4.1.0, 4.1.1) were superseded and are no longer
 published.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [4.1.2] — 2026-05-25
+
+A bug fix release on top of 4.1.1.
+
+### Fixed
+
+- **Saving after a scan no longer fails with "No resolvers found" when
+  the user toggled the VPN mode between MasterDNS and VayDNS.**
+
+  Previous behavior: switching VPN engine via the segmented control
+  silently wiped the in-memory scan results, so clicking Save afterwards
+  showed "No resolvers found" even though the log still displayed the
+  successful verification line ("Phase 3 complete: 69 resolvers E2E
+  verified, ready to save").
+
+  Fixed by removing the unconditional reset on mode change. Scan results
+  now persist across mode toggles, and the appropriate save button is
+  enabled for whichever engine is active. This also lets users save the
+  same scan under both MasterDNS and VayDNS profiles, which several
+  users had asked for.
+
+  Workaround in older versions: if you hit this in 4.1.1 or 4.1.0,
+  re-run the scan before switching modes, or upgrade to 4.1.2.
+
+- The trash/Clear button still resets everything (results, tree, log,
+  buttons) as before — this is the explicit way to start fresh.
 
 ---
 

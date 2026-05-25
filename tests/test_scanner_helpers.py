@@ -149,3 +149,40 @@ class TestGetIranSample:
         # we get one round of 4 IPs then break. Document the behaviour.
         sample = kn.get_iran_sample(max_ips=0)
         assert isinstance(sample, list)
+
+
+class TestModeSwitchPreservesResults:
+    """Regression tests for the bug where switching VPN mode after a
+    completed scan silently wiped self._found_ips, producing the
+    misleading "No resolvers found" dialog on Save even though the log
+    showed successful E2E verification. (Reported in 4.1.1, fixed in
+    4.1.2.)
+
+    These are static checks on the source - exercising _set_vpn_mode
+    end-to-end requires a Tk environment which the test suite avoids.
+    The static checks would have caught the bug at code-review time.
+    """
+
+    def test_set_vpn_mode_does_not_clear_found_ips(self, kn):
+        import inspect
+        src = inspect.getsource(kn.App._set_vpn_mode)
+        # The clear() call was the bug. It must not reappear.
+        assert "_found_ips.clear()" not in src, (
+            "_set_vpn_mode must NOT clear self._found_ips - "
+            "mode toggles should preserve scan results "
+            "(see CHANGELOG 4.1.2)")
+
+    def test_set_vpn_mode_does_not_clear_dohdot_results(self, kn):
+        import inspect
+        src = inspect.getsource(kn.App._set_vpn_mode)
+        assert "_doh_found.clear()" not in src, (
+            "_set_vpn_mode must NOT clear self._doh_found")
+        assert "_dot_found.clear()" not in src, (
+            "_set_vpn_mode must NOT clear self._dot_found")
+
+    def test_clear_button_still_resets_found_ips(self, kn):
+        # _clear is the explicit reset path - it SHOULD clear.
+        import inspect
+        src = inspect.getsource(kn.App._clear)
+        assert "_found_ips.clear()" in src, (
+            "_clear must still reset scan results")

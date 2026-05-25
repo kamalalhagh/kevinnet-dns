@@ -8,7 +8,7 @@ import asyncio, os, queue, random, sys, threading, time
 from datetime import datetime
 from pathlib import Path
 
-__version__ = "4.1.1"
+__version__ = "4.1.2"
 
 # ── Embedded app icon (base64 PNG, 256x256) ────────────────────
 ICON_B64 = (
@@ -7117,13 +7117,50 @@ class App(tk.Tk):
                           if fa else
                           "Start Scan = UDP/53 resolvers  |  Scan DoH/DoT = encrypted endpoints"))
 
-        # Reset scan state whenever mode changes
-        self._found_ips.clear()
-        self._doh_found.clear()
-        self._dot_found.clear()
-        for row in self._W.get("tree", tk.Frame()).winfo_children():
-            try: row.destroy()
-            except Exception: pass
+        # NOTE: Previously this block cleared self._found_ips and the tree,
+        # on the theory that switching VPN engine should reset scan state.
+        # That was wrong - users (a) often want to save the same scanned
+        # resolvers under both engines and (b) the tree.delete loop only
+        # destroyed Treeview child widgets (which don't exist; tree rows
+        # are accessed via get_children, not winfo_children), so the
+        # visible result was: in-memory results wiped but tree still
+        # populated, leading to "No resolvers found" on Save despite
+        # the log showing successful verification.
+        #
+        # The fix: do NOT clear scan results on mode switch. Users can
+        # explicitly clear via the 🗑 Clear button if they want a reset.
+        # If a save button is enabled but the active mode changed, it
+        # remains enabled and uses the existing scan results.
+
+        # After the mode switch, the visible save button is the new
+        # mode's. Sync its state to whether results actually exist so
+        # users can save the same scan under either engine.
+        try:
+            has_udp = bool(self._found_ips)
+            has_dohdot = bool(getattr(self, "_doh_found", []) or
+                              getattr(self, "_dot_found", []))
+            if mode == "masterdns":
+                # MasterDNS profile = UDP resolvers only
+                if has_udp:
+                    W["btn_save"].config(state="normal", bg=BLUE,
+                                          fg=BTN_TEXT,
+                                          disabledforeground=DIS_FG)
+                else:
+                    W["btn_save"].config(state="disabled",
+                                          bg=DIS_BG, fg=DIS_FG,
+                                          disabledforeground=DIS_FG)
+            else:  # vaydns
+                # VayDNS save accepts UDP or DoH/DoT results
+                if has_udp or has_dohdot:
+                    W["btn_vd_save"].config(state="normal", bg=PURPLE,
+                                             fg=BTN_TEXT,
+                                             disabledforeground=DIS_FG)
+                else:
+                    W["btn_vd_save"].config(state="disabled",
+                                             bg=DIS_BG, fg=DIS_FG,
+                                             disabledforeground=DIS_FG)
+        except Exception:
+            pass
 
     # ── LEFT PANEL ──────────────────────────────────────────────
     def _build_left(self, parent):

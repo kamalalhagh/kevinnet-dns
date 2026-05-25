@@ -5,14 +5,46 @@ All notable changes to **KevinNet DNS** are documented in this file.
 This project ships only two public releases:
 
 - **v3.2.2** — the original stable release. Still available, still works.
-- **v4.1.4** — the current release. Recommended for all users.
+- **v4.1.5** — the current release. Recommended for all users.
 
 There are no intermediate versions on GitHub. Older internal iterations
-(3.3.x, 3.4.x, 4.0.x, 4.1.0, 4.1.1, 4.1.2, 4.1.3) were superseded and
-are no longer published.
+(3.3.x, 3.4.x, 4.0.x, 4.1.0–4.1.4) were superseded and are no longer
+published.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [4.1.5] — 2026-05-26
+
+A small polish release on top of 4.1.4.
+
+### Changed
+
+- **Default language is now English.** New users on Windows and Linux
+  see a clean ASCII interface on first launch instead of Persian. The
+  preference is persisted to `kevinnet_settings.json` after the first
+  toggle, so users who switch to Persian (فارسی) once will keep
+  getting Persian on every subsequent launch — only fresh installs
+  default to English.
+
+- **Wider left panel on Windows and Linux.** The Scanner-tab left
+  panel was 360px wide on every platform, which fit comfortably on
+  macOS (Aqua renders compact widgets) but clipped long Persian
+  button text on Windows ("ذخیره در MasterDNS" was being cut to
+  "ذخیره در asterDNS" with the "M" missing). The panel is now 420px
+  wide on Windows and Linux while staying at 360px on macOS — the
+  minimum window width grew accordingly so all controls remain
+  reachable without horizontal scrolling.
+
+### Why two platforms, two widths
+
+macOS's Tk renderer (Aqua) uses tighter intrinsic widget padding
+than Windows GDI or X11 Tk. The same nominal pixel width holds
+substantially less visible content on Windows. Rather than blow up
+the macOS layout to match the worst case, we now branch on
+`sys.platform` and pick the right value for each.
 
 ---
 

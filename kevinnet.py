@@ -8,7 +8,7 @@ import asyncio, os, queue, random, sys, threading, time
 from datetime import datetime
 from pathlib import Path
 
-__version__ = "4.1.4"
+__version__ = "4.1.5"
 
 # ── Embedded app icon (base64 PNG, 256x256) ────────────────────
 ICON_B64 = (
@@ -5422,6 +5422,20 @@ def get_vaydns_exe() -> Path | None:
 #  MAIN APPLICATION
 # ═══════════════════════════════════════════════════════════════
 class App(tk.Tk):
+    # ── Platform-aware layout constants ─────────────────────────
+    # macOS Tk (Aqua) renders widgets compactly with tight padding.
+    # Windows (GDI + Segoe UI) and Linux (X11 + Liberation Sans) need
+    # more horizontal space for the same Persian button text to avoid
+    # clipping ("ذخیره در MasterDNS" got truncated to "ذخیره در asterDNS"
+    # at 360px on Windows). Bumping the left-panel width on those
+    # platforms fixes it without making macOS look spaced-out.
+    if sys.platform == "darwin":
+        _LEFT_PANEL_W = 360    # macOS: compact, fits comfortably
+        _LEFT_INNER_W = 340
+    else:
+        _LEFT_PANEL_W = 420    # Windows / Linux: extra breathing room
+        _LEFT_INNER_W = 400
+
     def __init__(self):
         # DPI awareness BEFORE super().__init__()
         if sys.platform == "win32":
@@ -5437,9 +5451,22 @@ class App(tk.Tk):
         super().__init__()
         self.title("KevinNet DNS")
         self.configure(bg=BG)
-        self.minsize(900, 680)   # minimum - all buttons always visible
+        # Min window size scales with the left panel width so all
+        # buttons remain visible without horizontal scrolling.
+        _min_w = 540 + self._LEFT_PANEL_W   # right panel + left panel + padding
+        self.minsize(_min_w, 680)
 
-        self._lang      = "fa"
+        # Default language is English so new users on Windows/Linux see
+        # a clean ASCII UI on first launch. Users who switch to Persian
+        # have their preference persisted in kevinnet_settings.json and
+        # restored here on subsequent launches.
+        self._lang = "en"
+        try:
+            saved_lang = load_settings().get("lang")
+            if saved_lang in ("en", "fa"):
+                self._lang = saved_lang
+        except Exception:
+            pass
         self._found_ips : list[str] = []
         # DoH/DoT scan results - kept separate from _found_ips (which is
         # UDP IP addresses) because they need a different transport flag
@@ -5837,13 +5864,16 @@ class App(tk.Tk):
         # ── Scanner view ─────────────────────────────────────────
         body = self._scanner_view
 
-        # Scrollable left panel - buttons always accessible even on small screens
-        left_outer = tk.Frame(body, bg=BG, width=360)
+        # Scrollable left panel - width is platform-aware (see
+        # _LEFT_PANEL_W on the class - wider on Win/Linux for Persian
+        # button text).
+        left_outer = tk.Frame(body, bg=BG, width=self._LEFT_PANEL_W)
         left_outer.pack(side="left", fill="y", padx=(16, 8), pady=16)
         left_outer.pack_propagate(False)
 
         left_canvas = tk.Canvas(left_outer, bg=BG, bd=0,
-                                highlightthickness=0, width=340)
+                                highlightthickness=0,
+                                width=self._LEFT_INNER_W)
         left_scroll = ttk.Scrollbar(left_outer, orient="vertical",
                                     command=left_canvas.yview)
         left_scroll.pack(side="right", fill="y")
@@ -5851,7 +5881,8 @@ class App(tk.Tk):
 
         left = tk.Frame(left_canvas, bg=BG)
         left_win = left_canvas.create_window((0, 0), window=left,
-                                              anchor="nw", width=340)
+                                              anchor="nw",
+                                              width=self._LEFT_INNER_W)
 
         def _on_left_configure(e):
             left_canvas.configure(scrollregion=left_canvas.bbox("all"))
@@ -7709,6 +7740,13 @@ class App(tk.Tk):
                 duration_ms=2500)
             return
         self._lang = "en" if self._lang == "fa" else "fa"
+        # Persist preference so it survives restart
+        try:
+            s = load_settings()
+            s["lang"] = self._lang
+            save_settings(s)
+        except Exception:
+            pass
         self._refresh_lang()
 
     # ── THEME ───────────────────────────────────────────────────
@@ -8144,13 +8182,14 @@ class App(tk.Tk):
         creation in _build_ui."""
         body = self._scanner_view
 
-        # Left panel
-        left_outer = tk.Frame(body, bg=BG, width=360)
+        # Left panel - same platform-aware width as _build_ui
+        left_outer = tk.Frame(body, bg=BG, width=self._LEFT_PANEL_W)
         left_outer.pack(side="left", fill="y", padx=(16, 8), pady=16)
         left_outer.pack_propagate(False)
 
         left_canvas = tk.Canvas(left_outer, bg=BG, bd=0,
-                                highlightthickness=0, width=340)
+                                highlightthickness=0,
+                                width=self._LEFT_INNER_W)
         left_scroll = ttk.Scrollbar(left_outer, orient="vertical",
                                     command=left_canvas.yview)
         left_scroll.pack(side="right", fill="y")
@@ -8158,7 +8197,8 @@ class App(tk.Tk):
 
         left = tk.Frame(left_canvas, bg=BG)
         left_win = left_canvas.create_window((0, 0), window=left,
-                                              anchor="nw", width=340)
+                                              anchor="nw",
+                                              width=self._LEFT_INNER_W)
 
         def _on_left_configure(e):
             left_canvas.configure(scrollregion=left_canvas.bbox("all"))

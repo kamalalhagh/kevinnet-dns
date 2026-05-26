@@ -5,14 +5,48 @@ All notable changes to **KevinNet DNS** are documented in this file.
 This project ships only two public releases:
 
 - **v3.2.2** — the original stable release. Still available, still works.
-- **v4.1.5** — the current release. Recommended for all users.
+- **v4.1.6** — the current release. Recommended for all users.
 
 There are no intermediate versions on GitHub. Older internal iterations
-(3.3.x, 3.4.x, 4.0.x, 4.1.0–4.1.4) were superseded and are no longer
+(3.3.x, 3.4.x, 4.0.x, 4.1.0–4.1.5) were superseded and are no longer
 published.
 
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and version numbers follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+---
+
+## [4.1.6] — 2026-05-26
+
+A small polish release on top of 4.1.5.
+
+### Changed
+
+- **Language toggle now shows a restart-required toast** instead of
+  rebuilding the scanner panel live. This is the same pattern the
+  theme toggle uses (since v4.1.0). The toast appears in the
+  newly-chosen language, the preference is persisted to
+  `kevinnet_settings.json` immediately, and the next launch picks it
+  up.
+
+  Why the change: the live rebuild path had subtle correctness bugs
+  (Treeview rows occasionally lost, log contents stale, tab labels
+  in the profiles tabs not rebuilt because they're constructed
+  lazily). Persisting and restarting matches what theme does and
+  keeps the UI consistent.
+
+- **Left panel widened to 450px on Windows and Linux** (was 420px in
+  4.1.5, was 360px before that). On Windows displays at 125% or 150%
+  DPI scaling, 420px was still tight for "ذخیره در MasterDNS
+  Profiles" — the "Profiles" suffix could push against the right
+  edge. 450px leaves a comfortable margin across common DPI values.
+  macOS stays at 360px so the layout doesn't look spaced-out there.
+
+### Internal
+
+- `_refresh_lang` and `_rebuild_scanner_view` removed; their callers
+  are gone now that language switching restarts the app instead of
+  rebuilding live.
 
 ---
 

@@ -8,7 +8,7 @@ import asyncio, os, queue, random, sys, threading, time
 from datetime import datetime
 from pathlib import Path
 
-__version__ = "4.1.5"
+__version__ = "4.1.6"
 
 # ── Embedded app icon (base64 PNG, 256x256) ────────────────────
 ICON_B64 = (
@@ -5433,8 +5433,15 @@ class App(tk.Tk):
         _LEFT_PANEL_W = 360    # macOS: compact, fits comfortably
         _LEFT_INNER_W = 340
     else:
-        _LEFT_PANEL_W = 420    # Windows / Linux: extra breathing room
-        _LEFT_INNER_W = 400
+        # Windows GDI + Segoe UI and Linux X11 + Liberation Sans need
+        # noticeably more horizontal space than macOS Aqua for the
+        # same Persian button text. 360 clipped "ذخیره در MasterDNS";
+        # 420 helped but the "MasterDNS" suffix could still get close
+        # to the right edge on some Windows display scales (125% / 150%
+        # DPI). 450 leaves comfortable margin across the common DPI
+        # values without making the macOS layout look stretched.
+        _LEFT_PANEL_W = 450
+        _LEFT_INNER_W = 430
 
     def __init__(self):
         # DPI awareness BEFORE super().__init__()
@@ -7733,21 +7740,53 @@ class App(tk.Tk):
 
     # ── LANGUAGE ────────────────────────────────────────────────
     def _toggle_lang(self):
+        """Switch language preference and prompt the user to restart.
+
+        Earlier versions attempted a live language switch by destroying
+        and rebuilding the entire scanner panel. That worked for most
+        of the UI but had subtle bugs (Treeview rows occasionally lost,
+        log contents stale, tab labels in the profiles tabs not
+        rebuilt because they're constructed lazily, etc.). The honest
+        and consistent fix is to match the theme-switch behavior:
+        persist the preference, show a toast, and apply on restart.
+        That way the whole UI is built once at startup in the chosen
+        language and stays consistent.
+        """
         if getattr(self, "_scan_locked", False):
             self._show_toast(
                 "صبر کنید تا اسکن تمام شود" if self._lang == "fa"
                 else "Wait until the scan finishes",
                 duration_ms=2500)
             return
-        self._lang = "en" if self._lang == "fa" else "fa"
-        # Persist preference so it survives restart
+
+        new_lang = "en" if self._lang == "fa" else "fa"
+
+        # Persist preference so the next launch picks it up
         try:
             s = load_settings()
-            s["lang"] = self._lang
+            s["lang"] = new_lang
             save_settings(s)
         except Exception:
             pass
-        self._refresh_lang()
+
+        # Update the toggle button immediately so the user gets visual
+        # feedback that their click registered. The button text shows
+        # the language they'd switch TO next (so after picking Persian,
+        # the button says "English" pointing at the reverse direction).
+        try:
+            self._W["btn_lang"].config(
+                text="English" if new_lang == "fa" else _bidi("فارسی"))
+        except Exception:
+            pass
+
+        # Show a restart-required toast in the NEW language (since
+        # that's what the user just asked for - if they picked Persian,
+        # the toast should be in Persian).
+        if new_lang == "fa":
+            msg = _bidi("زبان تغییر کرد. برای اعمال، برنامه را دوباره باز کنید.")
+        else:
+            msg = "Language changed. Restart KevinNet to apply."
+        self._show_toast(msg, duration_ms=4500)
 
     # ── THEME ───────────────────────────────────────────────────
     def _toggle_theme(self):
@@ -8016,204 +8055,6 @@ class App(tk.Tk):
         # Cache the lock state so click handlers can check it
         self._scan_locked = locked
 
-
-        """Update all language-dependent labels after a language switch.
-
-        With the v4.0.0 card-based UI, the cleanest approach is to
-        rebuild the scanner left/right panels from scratch (they're
-        cheap to construct, and rebuilding guarantees no stale text).
-        Profile tabs are refreshed on next selection.
-
-        Top-bar buttons (Help, Lang, Theme) update in place since they
-        have stable widget keys.
-        """
-        fa = self._lang == "fa"
-        W  = self._W
-
-        # ── Top-bar buttons: easy, single widgets ──
-        try:
-            # When current lang is fa, toggle text shows "English" - which is
-            # English, no bidi needed. When current lang is en, toggle shows
-            # "فارسی" - which IS Persian and needs bidi on Windows.
-            lang_btn_text = "English" if fa else _bidi("فارسی")
-            W["btn_lang"].config(text=lang_btn_text,
-                                  fg=ACCENT,
-                                  font=FA(11, "bold") if fa else F(11, "bold"))
-        except Exception:
-            pass
-        try:
-            W["btn_help"].config(text=_bidi("؟" if fa else "?"),
-                                  font=FA(12, "bold") if fa else F(12, "bold"))
-        except Exception:
-            pass
-
-        # ── Tab bar ──
-        for wkey, en, fa_t in [
-            ("tab_scanner",     "Scanner",            "اسکنر"),
-            ("tab_profiles",    "MasterDNS Profiles", "MasterDNS Profiles"),
-            ("tab_vd_profiles", "VayDNS Profiles",    "VayDNS Profiles"),
-        ]:
-            if wkey in W:
-                try:
-                    W[wkey].config(text=_bidi(fa_t) if fa else en,
-                                    font=FA(12, "bold") if fa else F(12, "bold"))
-                except Exception:
-                    pass
-
-        # ── Rebuild the scanner panel ──
-        # The cards have inline labels that aren't easily addressable
-        # by key. Tear down and rebuild — fast and bug-free.
-        try:
-            # Preserve current values across rebuild
-            saved = {
-                "domain":  self._domain_var.get(),
-                "key":     self._key_var.get(),
-                "pubkey":  self._vd_pubkey_var.get(),
-                "country": self._country_var.get(),
-                "mode":    self._vpn_mode.get(),
-                "target":  self._target_var.get(),
-                "conc":    self._conc_var.get(),
-                "timeout": self._timeout_var.get(),
-                "pool":    self._pool_var.get(),
-            }
-
-            # Also preserve tree contents (resolver list shown to user)
-            # and log contents. Without this, switching language after
-            # a successful scan wipes the visible results - confusing
-            # because _found_ips still has the data but the UI shows
-            # nothing.
-            saved_rows = []
-            try:
-                tree = self._W.get("tree")
-                if tree is not None:
-                    for row in tree.get_children():
-                        vals = tree.item(row, "values")
-                        tags = tree.item(row, "tags") or ()
-                        if vals:
-                            saved_rows.append((tuple(vals), tuple(tags)))
-            except Exception:
-                pass
-
-            saved_log = ""
-            try:
-                log = self._W.get("log")
-                if log is not None:
-                    saved_log = log.get("1.0", "end-1c")
-            except Exception:
-                pass
-
-            # Destroy and rebuild left panel
-            for child in self._scanner_view.winfo_children():
-                child.destroy()
-            self._rebuild_scanner_view()
-
-            # Restore values
-            self._domain_var.set(saved["domain"])
-            self._key_var.set(saved["key"])
-            self._vd_pubkey_var.set(saved["pubkey"])
-            self._country_var.set(saved["country"])
-            self._target_var.set(saved["target"])
-            self._conc_var.set(saved["conc"])
-            self._timeout_var.set(saved["timeout"])
-            self._pool_var.set(saved["pool"])
-
-            # Re-apply mode reshape with restored selection
-            self._set_vpn_mode(saved["mode"])
-
-            # Restore tree contents - the new Treeview from _rebuild was
-            # empty. Re-insert each row with its original values + tags
-            # so the user keeps seeing their scan results.
-            try:
-                tree = self._W.get("tree")
-                if tree is not None and saved_rows:
-                    for vals, tags in saved_rows:
-                        tree.insert("", "end", values=vals, tags=tags)
-                    # Re-apply tag colors (foreground for e2e/doh/dot rows)
-                    tree.tag_configure("e2e", foreground="#a78bfa")
-                    tree.tag_configure("doh", foreground="#5eead4")
-                    tree.tag_configure("dot", foreground="#a5b4fc")
-            except Exception:
-                pass
-
-            # Restore log contents
-            try:
-                log = self._W.get("log")
-                if log is not None and saved_log:
-                    log.config(state="normal")
-                    log.insert("1.0", saved_log)
-                    log.see("end")
-                    log.config(state="disabled")
-            except Exception:
-                pass
-
-            # Update badge and save-button state based on what's still
-            # in memory. This keeps the post-scan summary visible after
-            # a language switch.
-            fa = self._lang == "fa"
-            try:
-                n = len(self._found_ips)
-                if n > 0:
-                    self._W["badge"].config(
-                        text=_bidi(f"{n}  {'یافت‌شده' if fa else 'found'}"))
-                    if saved["mode"] == "masterdns":
-                        self._W["btn_save"].config(
-                            state="normal", bg=BLUE, fg=BTN_TEXT,
-                            disabledforeground=DIS_FG)
-                    else:
-                        self._W["btn_vd_save"].config(
-                            state="normal", bg=PURPLE, fg=BTN_TEXT,
-                            disabledforeground=DIS_FG)
-                    self._W["btn_export"].config(
-                        state="normal", bg=WARN, fg=BTN_TEXT,
-                        cursor="hand2", disabledforeground=DIS_FG)
-            except Exception:
-                pass
-        except Exception as e:
-            # If anything goes wrong, log it; lang switch is non-critical
-            try:
-                self._log(f"language refresh: {e}")
-            except Exception:
-                pass
-
-    def _rebuild_scanner_view(self):
-        """Reconstruct the scanner view (left + right) from scratch.
-
-        Called after language switch. Mirrors the original layout
-        creation in _build_ui."""
-        body = self._scanner_view
-
-        # Left panel - same platform-aware width as _build_ui
-        left_outer = tk.Frame(body, bg=BG, width=self._LEFT_PANEL_W)
-        left_outer.pack(side="left", fill="y", padx=(16, 8), pady=16)
-        left_outer.pack_propagate(False)
-
-        left_canvas = tk.Canvas(left_outer, bg=BG, bd=0,
-                                highlightthickness=0,
-                                width=self._LEFT_INNER_W)
-        left_scroll = ttk.Scrollbar(left_outer, orient="vertical",
-                                    command=left_canvas.yview)
-        left_scroll.pack(side="right", fill="y")
-        left_canvas.pack(side="left", fill="both", expand=True)
-
-        left = tk.Frame(left_canvas, bg=BG)
-        left_win = left_canvas.create_window((0, 0), window=left,
-                                              anchor="nw",
-                                              width=self._LEFT_INNER_W)
-
-        def _on_left_configure(e):
-            left_canvas.configure(scrollregion=left_canvas.bbox("all"))
-        def _on_canvas_resize(e):
-            left_canvas.itemconfig(left_win, width=e.width)
-        left.bind("<Configure>", _on_left_configure)
-        left_canvas.bind("<Configure>", _on_canvas_resize)
-        left_canvas.configure(yscrollcommand=left_scroll.set)
-
-        self._build_left(left)
-
-        right = tk.Frame(body, bg=BG)
-        right.pack(side="left", fill="both", expand=True,
-                   padx=(0, 16), pady=16)
-        self._build_right(right)
 
     # ── LOG ─────────────────────────────────────────────────────
     def _log(self, msg):
